@@ -1,4 +1,12 @@
-// GH-02: App shell — implemented in next issue
+import './styles/App.css'
+
 export default function App() {
-  return <div>Bizdwaar — coming soon</div>
+  return (
+    <div className="app">
+      <header className="app-header">
+        <h1>Bizdwaar</h1>
+        <p>Your business's doorway to the digital world.</p>
+      </header>
+    </div>
+  )
 }
