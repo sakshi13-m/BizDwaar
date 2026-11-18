@@ -2,6 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { connectDB } from './db.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -29,8 +30,16 @@ if (process.env.NODE_ENV === 'production') {
   })
 }
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Bizdwaar server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`)
-})
+// Connect to MongoDB then start server
+connectDB()
+  .then(() => {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Bizdwaar server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`)
+    })
+  })
+  .catch((err) => {
+    console.error('Failed to connect to MongoDB:', err.message)
+    process.exit(1)
+  })
 
 export default app
