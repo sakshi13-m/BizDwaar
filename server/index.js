@@ -1,11 +1,17 @@
-import 'dotenv/config'
-import express from 'express'
-import path from 'path'
+import { config } from 'dotenv'
 import { fileURLToPath } from 'url'
+import path from 'path'
+
+// Resolve __dirname and load .env from repo root (works regardless of cwd)
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+config({ path: path.resolve(__dirname, '..', '.env') })
+
+import express from 'express'
+import cookieParser from 'cookie-parser'
 import { connectDB } from './db.js'
 import aiRouter from './routes/ai.js'
+import ownerRouter from './routes/owner.js'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.PORT || 3000
 
@@ -16,14 +22,16 @@ app.set('trust proxy', trustProxyHops)
 // Body parsing
 app.use(express.json({ limit: '100kb' }))
 app.use(express.urlencoded({ extended: true, limit: '100kb' }))
+app.use(cookieParser())
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// Routes
+// API routes
 app.use('/api/ai', aiRouter)
+app.use('/api/owner', ownerRouter)
 
 // Serve React build in production
 const distDir = path.resolve(__dirname, '..', 'dist')
