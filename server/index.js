@@ -12,6 +12,7 @@ import { connectDB } from './db.js'
 import aiRouter from './routes/ai.js'
 import ownerRouter from './routes/owner.js'
 import publicRouter from './routes/public.js'
+import enquiryRouter from './routes/enquiry.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -34,6 +35,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/ai', aiRouter)
 app.use('/api/owner', ownerRouter)
 app.use('/api/businesses', publicRouter) // Public GET /api/businesses/:slug
+app.use('/api/enquiries', enquiryRouter)  // Public POST /api/enquiries
 
 // Serve React build in production
 const distDir = path.resolve(__dirname, '..', 'dist')
