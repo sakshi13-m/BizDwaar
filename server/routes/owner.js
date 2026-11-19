@@ -195,9 +195,9 @@ router.post('/businesses/:id/publish', requireOwner, async (req, res) => {
 
   business.status      = 'published'
   business.publishedAt = new Date()
-  await business.save()
+  const saved = await Business._save(business)
 
-  return res.json({ ok: true, slug: business.slug, publishedAt: business.publishedAt })
+  return res.json({ ok: true, slug: saved.slug, publishedAt: saved.publishedAt })
 })
 
 export default router

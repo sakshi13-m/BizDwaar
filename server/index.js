@@ -37,25 +37,25 @@ app.use('/api/owner', ownerRouter)
 app.use('/api/businesses', publicRouter) // Public GET /api/businesses/:slug
 app.use('/api/enquiries', enquiryRouter)  // Public POST /api/enquiries
 
-// Serve React build in production
+// Serve React build when dist/ exists (production and GoDaddy hosting)
+import { existsSync } from 'fs'
 const distDir = path.resolve(__dirname, '..', 'dist')
-if (process.env.NODE_ENV === 'production') {
+if (existsSync(distDir)) {
   app.use(express.static(distDir))
   app.get('*', (req, res) => {
     res.sendFile(path.join(distDir, 'index.html'))
   })
 }
 
-// Connect to MongoDB then start server
+// Start server first so the platform health check passes, then connect DB
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Bizdwaar server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`)
+})
+
 connectDB()
-  .then(() => {
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Bizdwaar server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`)
-    })
-  })
   .catch((err) => {
-    console.error('Failed to connect to MongoDB:', err.message)
-    process.exit(1)
+    console.error('Failed to connect to MySQL:', err.message)
+    setTimeout(() => connectDB().catch(e => console.error('DB retry failed:', e.message)), 5000)
   })
 
 export default app
