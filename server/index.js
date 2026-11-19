@@ -3,6 +3,7 @@ import express from 'express'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { connectDB } from './db.js'
+import aiRouter from './routes/ai.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -20,6 +21,9 @@ app.use(express.urlencoded({ extended: true, limit: '100kb' }))
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
+
+// Routes
+app.use('/api/ai', aiRouter)
 
 // Serve React build in production
 const distDir = path.resolve(__dirname, '..', 'dist')
