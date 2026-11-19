@@ -2,8 +2,9 @@ import nodemailer from 'nodemailer'
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: process.env.SMTP_SECURE === 'true',
+  port: Number(process.env.SMTP_PORT || 587),
+  // Port 465 = implicit SSL; port 587 = STARTTLS. GoDaddy platform blocks 465 outbound.
+  secure: Number(process.env.SMTP_PORT || 587) === 465,
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS

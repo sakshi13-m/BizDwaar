@@ -12,7 +12,7 @@ router.get('/:slug', async (req, res) => {
   const business = await Business.findOne({
     slug: req.params.slug,
     status: 'published'
-  }).lean()
+  })
 
   if (!business) {
     return res.status(404).json({

@@ -112,7 +112,7 @@ router.post('/businesses', requireOwner, async (req, res) => {
 // Load full draft + approved data for editing
 // -------------------------------------------------------
 router.get('/businesses/:id', requireOwner, async (req, res) => {
-  const business = await Business.findById(req.params.id).lean()
+  const business = await Business.findById(req.params.id)
   if (!business) {
     return res.status(404).json({ error: 'not_found', message: 'Business not found.' })
   }

@@ -87,7 +87,9 @@ export async function analyseBusinessInput(input) {
 
   let parsed
   try {
-    parsed = JSON.parse(raw)
+    // Strip markdown code fences if Claude wraps the JSON (e.g. ```json ... ```)
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+    parsed = JSON.parse(cleaned)
   } catch {
     throw new Error('Claude response was not valid JSON: ' + raw.slice(0, 200))
   }
