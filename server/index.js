@@ -11,6 +11,7 @@ import cookieParser from 'cookie-parser'
 import { connectDB } from './db.js'
 import aiRouter from './routes/ai.js'
 import ownerRouter from './routes/owner.js'
+import publicRouter from './routes/public.js'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -32,6 +33,7 @@ app.get('/api/health', (req, res) => {
 // API routes
 app.use('/api/ai', aiRouter)
 app.use('/api/owner', ownerRouter)
+app.use('/api/businesses', publicRouter) // Public GET /api/businesses/:slug
 
 // Serve React build in production
 const distDir = path.resolve(__dirname, '..', 'dist')
