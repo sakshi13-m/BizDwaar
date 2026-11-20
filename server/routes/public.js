@@ -31,7 +31,7 @@ router.get('/:slug', async (req, res) => {
     contactEmail: business.approvedProfile?.contactEmail || null,
     contactPhone: business.approvedProfile?.contactPhone || null,
     catalogue: (business.approvedCatalogue || [])
-      .filter(item => item.publicVisible !== false)
+      .filter(item => item.publicVisible === true)
       .map(item => ({
         name: item.name,
         description: item.description,

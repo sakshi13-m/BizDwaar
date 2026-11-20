@@ -16,6 +16,7 @@ export default function EnquiryForm({ businessSlug }) {
   })
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
   const [error, setError] = useState('')
 
   function update(field, value) {
@@ -48,6 +49,7 @@ export default function EnquiryForm({ businessSlug }) {
         return
       }
 
+      setSuccessMessage(data.message || 'Your enquiry has been received.')
       setSuccess(true)
     } catch {
       setLoading(false)
@@ -59,8 +61,8 @@ export default function EnquiryForm({ businessSlug }) {
     return (
       <div className="page-center">
         <div className="card">
-          <h2 style={{ marginBottom: '0.75rem' }}>Enquiry sent</h2>
-          <p className="hint">Your enquiry has been received. The business owner will be in touch.</p>
+          <h2 style={{ marginBottom: '0.75rem' }}>Enquiry received</h2>
+          <p className="hint">{successMessage}</p>
           <button
             className="btn-secondary"
             style={{ marginTop: '1rem' }}

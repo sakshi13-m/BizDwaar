@@ -88,6 +88,7 @@ router.post('/businesses', requireOwner, async (req, res) => {
       suggestedCategory: draft.suggestedCategory,
       catalogueDrafts:   draft.catalogueDrafts,
       missingQuestions:  draft.missingQuestions,
+      unsupportedClaims: draft.unsupportedClaims || [],
       analysedAt:        new Date()
     }
   } catch (err) {
@@ -139,7 +140,7 @@ const UpdateBusinessSchema = z.object({
     price:         z.string().max(100).nullable(),
     unitOrSize:    z.string().max(100).nullable(),
     attributes:    z.array(z.string()).default([]),
-    publicVisible: z.boolean().default(true)
+    publicVisible: z.boolean().default(false)
   })).optional()
 })
 
