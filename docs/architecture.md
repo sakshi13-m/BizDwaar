@@ -46,7 +46,9 @@ flowchart LR
 
 ---
 
-## 2. Main flow
+## 2. Main flows
+
+### 2.1 Describe → publish → enquiry
 
 ```mermaid
 sequenceDiagram
@@ -60,13 +62,13 @@ sequenceDiagram
 
   Owner->>UI: open /owner
   UI->>API: POST /api/owner/session
-  API-->>UI: Set-Cookie bdOwnerSession (HttpOnly)
+  API-->>UI: Set-Cookie bdOwnerSession (HttpOnly, 30 days) — anonymous, no registration
   Owner->>UI: describe business
   UI->>API: POST /api/owner/businesses
   API->>Claude: owner facts + strict "never invent" prompt
   Claude-->>API: JSON draft (profile, items with INR prices, missingQuestions, unsupportedClaims)
   API->>API: Zod-validate draft, prices → numbers (failure ⇒ empty draft, owner input kept)
-  API->>DB: INSERT business (status=draft, owner_session_hash)
+  API->>DB: INSERT business (status=draft, owner_session_hash, owner_id if logged in)
   Owner->>UI: review, answer questions, choose visible items
   UI->>API: PUT /api/owner/businesses/:id (approved working copy, private)
   UI->>API: POST /api/owner/businesses/:id/publish
@@ -76,9 +78,57 @@ sequenceDiagram
   Owner->>API: later edits: PUT (stay private) … publish again to go live
   Customer->>API: POST /api/enquiries (optional productName)
   API->>DB: INSERT enquiry (status=new)
-  API--)API: email owner via HTTPS API (failure recorded, not shown to customer)
+  API--)API: email owner's login address, or ENQUIRY_TO (failure recorded, not shown to customer)
   Owner->>API: GET /enquiries · PATCH status
 ```
+
+### 2.2 Owner access: anonymous session → optional email login → claim → logout
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Owner
+  participant UI as React (owner workspace)
+  participant API as Express API
+  participant DB as MySQL
+  participant Mail as Resend (HTTPS)
+
+  Note over Owner,DB: Anonymous: pages are owned by the browser session (businesses.owner_session_hash)
+  UI->>API: GET /api/owner/me
+  API-->>UI: { loggedIn: false, emailLogin } — Log in shown only if emailLogin
+  Owner->>UI: Log in → enter email
+  UI->>API: POST /api/owner/login/code { email }
+  API->>DB: cancel unused codes, INSERT login_codes (salted hash, 10 min)
+  API->>Mail: send 6-digit code
+  Mail-->>Owner: email with code
+  Owner->>UI: enter code
+  UI->>API: POST /api/owner/login/verify { email, code }
+  API->>DB: check newest active code (≤ 5 attempts), mark consumed
+  API->>DB: find or create owners row
+  API->>DB: claim — set owner_id on this browser's pages that have none
+  API->>DB: DELETE old session row · INSERT owner_sessions (new hash, owner_id, 30 days)
+  API-->>UI: Set-Cookie bdOwnerSession (new secret) · { email, claimed }
+  Note over Owner,DB: Account: pages are owned by owner_id and manageable on any device after login
+  Owner->>UI: log in on another device (same email)
+  UI->>API: login/code + login/verify
+  API-->>UI: new session for the same owner_id → same pages listed
+  Owner->>UI: Log out
+  UI->>API: POST /api/owner/logout
+  API->>DB: DELETE owner_sessions row for this device
+  API-->>UI: clear cookies
+  UI->>API: POST /api/owner/session (fresh anonymous session)
+```
+
+**Ownership rule** (`requireBusinessOwnership` in `server/middleware/ownerAuth.js`):
+
+| Page state | Who can manage it |
+|---|---|
+| `owner_id` is NULL (unclaimed) | The browser whose session hash equals `owner_session_hash` |
+| `owner_id` set (claimed or created while logged in) | Any session in `owner_sessions` for that `owner_id` (any device) — the anonymous browser no longer counts |
+| Any page | The administrator (`OWNER_ADMIN_TOKEN` cookie) |
+
+The workspace list (`GET /api/owner/businesses`) shows the account's pages plus this browser's unclaimed pages.
+Logout is offered only to logged-in owners, so unclaimed pages are never orphaned by it.
 
 ---
 
@@ -129,13 +179,13 @@ erDiagram
     json published_catalogue "snapshot at publish, public, nullable"
     enum status "draft | published"
     datetime published_at
-    char64 owner_session_hash "browser that created it, nullable"
-    char36 owner_id "account that owns it, nullable"
+    char64 owner_session_hash "browser session that created it, nullable"
+    char36 owner_id "account that owns it once claimed, nullable"
     datetime created_at
     datetime updated_at
   }
   OWNERS ||--o{ BUSINESSES : manages
-  OWNERS ||--o{ OWNER_SESSIONS : "logged in on"
+  OWNERS ||--o{ OWNER_SESSIONS : "logged in on (one row per device)"
   OWNERS {
     char36 id PK
     varchar email UK
@@ -204,7 +254,7 @@ NULL keeps serving `approved_*` exactly as before, until the owner next publishe
 |---|---|---|---|---|
 | GET | `/api/health` | — | — | `{ status: "ok" }` |
 | POST | `/api/owner/session` | — | — | `201 { created: true }` + cookie, or `200 { created: false }` |
-| GET | `/api/owner/businesses` | session | — | `{ businesses: [{ id, name, slug, status, … }] }` |
+| GET | `/api/owner/businesses` | session | — | account pages + this browser's unclaimed pages: `{ businesses: [{ id, name, slug, status, … }] }` |
 | POST | `/api/owner/businesses` | session, 10/h/IP | `{ businessName, businessType?, location?, description, productsRaw? }` | `201 { businessId, slug }` |
 | GET | `/api/owner/businesses/:id` | owner | — | `{ business }` incl. `hasUnpublishedChanges` (no session hash) |
 | PUT | `/api/owner/businesses/:id` | owner | `{ approvedProfile?, approvedCatalogue? }` — `price` a number (or numeric text) or `null` | `{ business }` · `400` with a readable message if a price isn't a rupee amount |
@@ -214,8 +264,8 @@ NULL keeps serving `approved_*` exactly as before, until the owner next publishe
 | POST | `/api/owner/login` | —, 10/15 min/IP | `{ token }` | admin cookie (optional fallback; token must be ≥ 32 chars) |
 | POST | `/api/owner/login/code` | —, 10/15 min/IP, 3/email | `{ email }` | emails a 6-digit code · `503` if email can't be sent |
 | POST | `/api/owner/login/verify` | —, 30/15 min/IP | `{ email, code }` | `{ email, claimed }` + new session cookie |
-| GET | `/api/owner/me` | — | — | `{ loggedIn, email, isAdmin }` |
-| POST | `/api/owner/logout` | — | — | ends the login session, clears cookies |
+| GET | `/api/owner/me` | — | — | `{ loggedIn, email, isAdmin, emailLogin }` |
+| POST | `/api/owner/logout` | — | — | deletes this device's `owner_sessions` row, clears cookies |
 | GET | `/api/owner/admin/businesses` | admin | — | every page with status, owner email, enquiry counts |
 | POST | `/api/ai/analyse` | session, 10/h/IP | as create | `{ draft }` (not saved) |
 | GET | `/api/businesses/:slug` | — | — | published snapshot, allowlisted, visible items only, `currency: "INR"` |
@@ -230,15 +280,20 @@ Errors are JSON: `{ error, message }`, with status codes 400 (validation or malf
 
 ```mermaid
 flowchart LR
-  R[Request with cookie] --> V{64-hex secret?}
+  R[Request with cookie] --> V{64-hex session secret?}
   V -- no --> A{Admin cookie valid?}
   A -- no --> X401[401]
   V -- yes --> H[SHA-256 hash]
-  H --> L[Load business :id]
+  H --> S[Look up owner_sessions<br/>→ owner_id if logged in and not expired]
+  S --> L[Load business :id]
   A -- yes --> L
-  L --> M{hash == owner_session_hash<br/>or admin?}
-  M -- no --> X403[403]
-  M -- yes --> OK[Handler]
+  L --> C{business.owner_id set?}
+  C -- yes --> M1{request owner_id == business.owner_id<br/>or admin?}
+  C -- no --> M2{hash == owner_session_hash<br/>or admin?}
+  M1 -- no --> X403[403]
+  M2 -- no --> X403
+  M1 -- yes --> OK[Handler]
+  M2 -- yes --> OK
 ```
 
 | Concern | Control |
