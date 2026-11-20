@@ -2,8 +2,9 @@
 
 ## Before you start: log in on the demo browser (recommended)
 
-**Login is optional for creating a business page** — any visitor can create and publish one without registering;
-it is then owned by their browser session. For the demo, log in once beforehand anyway:
+**Login is optional for creating a business page** — any visitor can create and edit a draft without registering.
+**Publishing** asks a visitor who isn't logged in to confirm their email first ("One last step": email → code →
+**Verify & publish**). For the demo, log in once beforehand so publishing goes straight through:
 
 1. On the browser you will present with, open `https://bizdwaar.in/owner` and publish (or open) Sara's Studio.
 2. Click **Log in**, enter your email, then the 6-digit code from `login@bizdwaar.in` (check spam once and mark
@@ -27,8 +28,8 @@ needs a fresh code.
 | 0:00–0:20 | Homepage: hero, *Before / After* band, the Describe → Update flow chart | Sara makes beautiful things, but her business lives in scattered chats and word of mouth. Bizdwaar gives it a digital home — free — and stays with her after launch. |
 | 0:20–0:50 | **Create your business page** → **Fill in a sample business** → **Organise with Bizdwaar** | No registration needed to start. Sara describes her studio in everyday words; Claude organises it. (Because you're logged in, "Welcome back" lists your pages above the form.) |
 | 0:50–1:30 | Review screen | "In your words → Organised by Bizdwaar". Prices come through in rupees. The dupatta price was left blank, not guessed — click **Answer**, type 890, and the field shows "Customers will see ₹890". "100% eco-friendly" was flagged and kept out until Sara reviews it (tick it to enable publishing). Items start hidden; switch them on and set availability. |
-| 1:30–1:55 | **Preview & publish** | The preview is the real page. Publish → shareable link. (A second Sara's Studio gets its own link, e.g. `/s/saras-studio-…`; the homepage example `/s/saras-studio` is the one you prepared.) |
-| 1:55–2:25 | Open that link in the customer window → **Ask about this** on a product → send an enquiry | Confirmed prices (₹), sizes and availability only. Blank prices say "Price on request". The enquiry carries the product of interest. |
+| 1:30–1:55 | **Preview & publish** | The preview is the real page. Publish → shareable link. (You're logged in, so it publishes straight away; a new owner would confirm their email here first, so enquiries reach them.) (A second Sara's Studio gets its own link, e.g. `/s/saras-studio-…`; the homepage example `/s/saras-studio` is the one you prepared.) |
+| 1:55–2:25 | Open that link in the customer window → **Ask about this** on a product → fill in a name, a phone number or email, and a message → send | Confirmed prices (₹), sizes and availability only. Blank prices say "Price on request". The customer must leave an email or phone so the owner can reply; the enquiry carries the product of interest. |
 | 2:25–2:50 | Back in the owner workspace → **View enquiries** → **Mark as replied**; then **Edit business page**, change a price, **Save changes** | The enquiry is in the private inbox. The status now shows "Live · changes not published yet" and the public page is unchanged — nothing goes live until Sara approves it. **Preview & update live** publishes the change. |
 | 2:50–3:00 | Close | Free business page today. Owners can find their own domain on GoDaddy from the homepage (connecting it is planned) and request a custom website from the team. AI drafts, the owner decides. |
 
@@ -73,8 +74,9 @@ The **"Fill in a sample business"** button on the onboarding screen loads exactl
 - **Claude is slow or unavailable, or the daily cap is reached:** the page is still created and the review
   screen says the AI organiser couldn't run — fill in the details by hand, or skip creation and walk through the
   prepared Sara's Studio with **Edit business page** instead.
-- **Email codes don't arrive:** you don't need to log in again if you stay on the logged-in demo browser.
-  Without login, create and publish a page anonymously — everything except cross-device access works.
+- **Email codes don't arrive:** you don't need to log in again if you stay on the logged-in demo browser. A
+  fresh visitor couldn't publish without the code, so demonstrate creation from the logged-in browser, or show
+  the prepared Sara's Studio.
 - **No internet / no MySQL — local fallback:** `npm run build && node server/test/helpers/localServer.js` runs the
   full app at http://127.0.0.1:3100 with an in-memory database and a canned Claude response, seeded with a
   published Sara's Studio. Nothing is saved. Login codes are printed in that terminal instead of being emailed,

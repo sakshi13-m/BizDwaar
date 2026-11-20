@@ -67,7 +67,9 @@ owner publishes it, and later edits stay private until the owner publishes again
    ticks off once answered. Products can be added, edited or removed; items start *hidden* until the owner
    switches them on; availability is shown only if the owner sets it. Flagged claims must be ticked as reviewed
    before the publish button is enabled.
-4. **Publish** — the preview is the real page; publishing creates `/s/:slug`.
+4. **Publish** — the preview is the real page. An owner who isn't logged in confirms their email here ("One last
+   step": email → 6-digit code → **Verify & publish**), so every live page has a verified owner email for
+   enquiries and access from any device. Publishing creates `/s/:slug`.
 5. **Connect** — customers browse the page and send enquiries, optionally about a specific product. If the page
    belongs to a logged-in owner account, the owner is also emailed at their login address.
 6. **Manage** — enquiries arrive in the owner inbox with status *new / replied / closed*.
@@ -79,20 +81,27 @@ owner publishes it, and later edits stay private until the owner publishes again
 ### Owner access and accounts
 
 Bizdwaar has two kinds of page ownership. Both use an `HttpOnly` session cookie; owners never see or type a token.
+**Drafts** can be created and edited anonymously; **publishing** requires a verified owner email (see below), so
+every new live page belongs to an account.
 
-| | **Anonymous (default)** | **Logged-in account (optional)** |
+| | **Anonymous browser session (drafts)** | **Owner account (required to publish)** |
 |---|---|---|
-| How it starts | Opening `/owner` creates an anonymous browser session automatically — no registration | **Log in** → enter an email → enter the 6-digit code sent to it (no password) |
+| How it starts | Opening `/owner` creates an anonymous browser session automatically — no registration | **Log in** at any time, or at **Publish** → enter an email → enter the 6-digit code sent to it (no password) |
 | Who owns a page | The browser session that created it (`businesses.owner_session_hash`) | The account (`businesses.owner_id`) |
 | Where it can be managed | Only in the original browser, while its session cookie lasts (30 days). Clearing cookies or switching device loses access | On any device, after logging in with the same email |
-| Enquiry emails | To the fallback address `ENQUIRY_TO` (the inbox always works) | To the owner's login email |
+| Enquiry emails | To the fallback address `ENQUIRY_TO` (only pages published before this rule, or while email was unavailable) | To the owner's login email |
 
 - **Claiming pages.** Logging in attaches every page created in that browser and not yet owned by an account to
   the account. The browser then gets a fresh session secret; the old anonymous one stops working.
 - **After login.** Pages created while logged in belong to the account immediately. The owner sees all of their
   account's pages under "Welcome back" on every device where they log in.
-- **Unclaimed pages stay browser-bound.** An owner who never logs in keeps managing their pages from the
-  original browser only; there is no recovery if that session is lost.
+- **Email required to publish.** Publishing a page that has no owner account is refused (`login_required`) and
+  the owner is asked to verify their email instead; verifying claims the draft and then publishes it. The
+  administrator can publish without an account. The rule applies only while email delivery is configured, so
+  owners are never blocked if email is unavailable. Existing anonymous live pages are asked to verify an email
+  the next time they are updated.
+- **Unclaimed drafts stay browser-bound.** Drafts that are never published or claimed can be edited only from the
+  original browser; there is no recovery if that session is lost.
 - **Exclusive ownership.** Once a page belongs to an account, only a logged-in session for that account (or the
   administrator) can edit it or read its enquiries — not the original anonymous browser, and not other accounts.
 - **Log out** ends that device's session on the server and clears its cookies; the workspace then starts a
@@ -106,7 +115,8 @@ Bizdwaar has two kinds of page ownership. Both use an `HttpOnly` session cookie;
 ### Customer
 
 Open `/s/:slug` → browse offerings (owner-confirmed prices in ₹, sizes, availability) → **Ask about this** on a
-product or **Send an enquiry** → the enquiry is stored and appears in the owner's inbox with the product of
+product or **Send an enquiry** → enter a name, a message and **an email or phone number (at least one is
+required, so the owner can reply)** → the enquiry is stored and appears in the owner's inbox with the product of
 interest.
 
 ---
@@ -141,12 +151,13 @@ Bizdwaar targets Indian micro-businesses, so every price is in **Indian Rupees**
 | Real-page preview and publish | ✅ Implemented |
 | Draft vs live: edits stay private until published again | ✅ Implemented |
 | Public business page (published, owner-approved fields only) | ✅ Implemented |
-| Customer enquiries with product of interest | ✅ Implemented |
+| Customer enquiries with product of interest; email or phone required so the owner can reply | ✅ Implemented |
 | Owner inbox with status filters | ✅ Implemented |
-| Start without registration (anonymous browser session owns the page) | ✅ Implemented |
-| Optional email one-time-code login that claims the browser's pages for an account | ✅ Implemented — verified in production (code received in a real inbox, login succeeded) |
+| Start without registration (anonymous browser session owns the draft) | ✅ Implemented |
+| Verified owner email required to publish ("One last step" at Publish) | ✅ Implemented (when email delivery is configured) |
+| Email one-time-code login that claims the browser's pages for an account (any time, or at Publish) | ✅ Implemented — verified in production (code received in a real inbox, login succeeded) |
 | Account-owned pages and enquiries managed from any device after login | ✅ Implemented |
-| Anonymous (unclaimed) pages managed from the original browser only | ✅ By design — no recovery without logging in |
+| Anonymous (unclaimed) drafts managed from the original browser only | ✅ By design — no recovery without logging in |
 | Log out (ends the device's session, clears cookies) | ✅ Implemented |
 | Email notification of enquiries | ✅ Implemented — Resend HTTPS API (GoDaddy blocks outbound SMTP) to the owner's login email, or `ENQUIRY_TO` for pages without an account. Same delivery path as the verified login codes; enquiry emails not separately verified. The inbox remains the source of truth |
 | Administrator view of all business pages (`/owner/admin`) | ✅ Implemented (needs a 32+ character `OWNER_ADMIN_TOKEN`) |
@@ -282,7 +293,7 @@ Secrets live only in environment variables — never in code, docs or `VITE_` va
 | POST | `/api/owner/businesses` | Owner session · 10/h per IP | Create a draft and run Claude analysis |
 | GET | `/api/owner/businesses/:id` | Owner of that business | Load draft + saved data (+ `hasUnpublishedChanges`) |
 | PUT | `/api/owner/businesses/:id` | Owner of that business | Save the working copy (not public until published) |
-| POST | `/api/owner/businesses/:id/publish` | Owner of that business | Publish the saved copy to the public page |
+| POST | `/api/owner/businesses/:id/publish` | Owner of that business | Publish the saved copy to the public page · `403 login_required` if the page has no owner account (when email is configured) |
 | GET | `/api/owner/businesses/:id/enquiries` | Owner of that business | List enquiries (latest 50) |
 | PATCH | `/api/owner/businesses/:id/enquiries/:enquiryId` | Owner of that business | Set status `new` / `replied` / `closed` |
 | POST | `/api/owner/login/code` | Anyone · 10/15 min per IP, 3 per email | Email a 6-digit login code (valid 10 min) |
@@ -293,7 +304,7 @@ Secrets live only in environment variables — never in code, docs or `VITE_` va
 | GET | `/api/owner/admin/businesses` | Admin | Every page with status, owner email and enquiry counts |
 | POST | `/api/ai/analyse` | Owner session · 10/h per IP | Run Claude analysis without saving |
 | GET | `/api/businesses/:slug` | Anyone | Public business page — published, allowlisted fields only |
-| POST | `/api/enquiries` | Anyone · 3/h per IP | Submit enquiry (honeypot, validation, optional `productName`) |
+| POST | `/api/enquiries` | Anyone · 3/h per IP | Submit enquiry (email or phone required; honeypot, validation, optional `productName`) |
 
 Requests for another owner's business return **403**; requests without a session return **401**. Unknown API
 routes return a JSON **404**; malformed request bodies return **400**.
@@ -369,9 +380,10 @@ Database migrations are additive and run automatically on startup. Details:
 
 ## Known limitations
 
-- **Anonymous pages are browser-bound:** owners who never log in can manage their pages only from the browser
-  session that created them, and lose access if that session is cleared. Login needs an email address;
-  phone/WhatsApp login is planned. Sessions last 30 days.
+- **Anonymous drafts are browser-bound:** drafts that are never published or claimed can be edited only from the
+  browser session that created them, and are lost to the owner if that session is cleared. Pages published
+  anonymously before the email-at-publish rule stay browser-bound until their owner verifies an email. Login
+  needs an email address; phone/WhatsApp login is planned. Sessions last 30 days.
 - **Email delivery** depends on Resend (GoDaddy blocks outbound SMTP). If the provider is unavailable, owners see
   an honest "couldn't send" message and enquiries are still saved in the inbox. New sending domains can land in
   spam at first.

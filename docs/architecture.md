@@ -72,11 +72,16 @@ sequenceDiagram
   Owner->>UI: review, answer questions, choose visible items
   UI->>API: PUT /api/owner/businesses/:id (approved working copy, private)
   UI->>API: POST /api/owner/businesses/:id/publish
+  alt page has no owner account (and email delivery is configured)
+    API-->>UI: 403 login_required
+    UI->>Owner: "One last step": confirm email (flow 2.2), which claims the draft
+    UI->>API: POST /api/owner/businesses/:id/publish (again)
+  end
   API->>DB: copy approved_* → published_*, status=published
   Customer->>API: GET /api/businesses/:slug
   API-->>Customer: allowlisted published fields, visible items only
   Owner->>API: later edits: PUT (stay private) … publish again to go live
-  Customer->>API: POST /api/enquiries (optional productName)
+  Customer->>API: POST /api/enquiries (email or phone required, optional productName)
   API->>DB: INSERT enquiry (status=new)
   API--)API: email owner's login address, or ENQUIRY_TO (failure recorded, not shown to customer)
   Owner->>API: GET /enquiries · PATCH status
@@ -258,7 +263,7 @@ NULL keeps serving `approved_*` exactly as before, until the owner next publishe
 | POST | `/api/owner/businesses` | session, 10/h/IP | `{ businessName, businessType?, location?, description, productsRaw? }` | `201 { businessId, slug }` |
 | GET | `/api/owner/businesses/:id` | owner | — | `{ business }` incl. `hasUnpublishedChanges` (no session hash) |
 | PUT | `/api/owner/businesses/:id` | owner | `{ approvedProfile?, approvedCatalogue? }` — `price` a number (or numeric text) or `null` | `{ business }` · `400` with a readable message if a price isn't a rupee amount |
-| POST | `/api/owner/businesses/:id/publish` | owner | — | copies the saved copy to the public snapshot · `{ slug, publishedAt }` or `422` if name/description missing |
+| POST | `/api/owner/businesses/:id/publish` | owner | — | copies the saved copy to the public snapshot · `{ slug, publishedAt }` · `422` if name/description missing · `403 login_required` if the page has no `owner_id` and email delivery is configured (admin exempt) |
 | GET | `/api/owner/businesses/:id/enquiries` | owner | — | `{ enquiries: [...] }` (latest 50) |
 | PATCH | `/api/owner/businesses/:id/enquiries/:enquiryId` | owner | `{ status }` | `{ enquiry }` · `404` if not this business's |
 | POST | `/api/owner/login` | —, 10/15 min/IP | `{ token }` | admin cookie (optional fallback; token must be ≥ 32 chars) |
@@ -269,7 +274,7 @@ NULL keeps serving `approved_*` exactly as before, until the owner next publishe
 | GET | `/api/owner/admin/businesses` | admin | — | every page with status, owner email, enquiry counts |
 | POST | `/api/ai/analyse` | session, 10/h/IP | as create | `{ draft }` (not saved) |
 | GET | `/api/businesses/:slug` | — | — | published snapshot, allowlisted, visible items only, `currency: "INR"` |
-| POST | `/api/enquiries` | —, 3/h/IP | `{ businessSlug, customerName, customerEmail?, customerPhone?, message, productName?, website(honeypot) }` | `{ ok, message }` |
+| POST | `/api/enquiries` | —, 3/h/IP | `{ businessSlug, customerName, customerEmail?, customerPhone?, message, productName?, website(honeypot) }` — at least one of email / phone (8–15 digits) | `{ ok, message }` · `400` with a readable message |
 
 Errors are JSON: `{ error, message }`, with status codes 400 (validation or malformed body), 401 (no session),
 403 (not your business), 404 (including unknown API routes), 422 (publish blocked), 429 (rate limit) and 500.
@@ -300,7 +305,7 @@ flowchart LR
 |---|---|
 | Owner identity | Server-generated 32-byte random secret; `HttpOnly`, `SameSite=Strict`, `Secure` (prod), 30 days. Only the SHA-256 hash is stored, and comparisons are constant-time. |
 | Owner login | Email one-time code: salted SHA-256 at rest, 10-minute expiry, single use, 5 attempts, newest code cancels older ones, per-IP and per-email limits. Login rotates the session secret and stores it in `owner_sessions`; logout deletes it. |
-| Ownership rule | A page with an `owner_id` is managed only by that account (any device). A page without one is managed only by the browser that created it until that browser logs in and claims it. The admin can manage every page. |
+| Ownership rule | A page with an `owner_id` is managed only by that account (any device). A page without one is managed only by the browser that created it until that browser logs in and claims it. Publishing requires an `owner_id` while email delivery is configured. The admin can manage and publish every page. |
 | Authorisation | `requireOwner` and `requireBusinessOwnership` on every business route; enquiry updates are scoped by `business_id`. Changing an ID in the URL cannot reach another owner's data. |
 | CSRF | `SameSite=Strict` cookies; JSON-only state-changing endpoints. |
 | Data exposure | The public endpoint builds an explicit allowlist from the published snapshot. `owner_input`, `ai_draft`, unpublished edits, session hashes and enquiries are never public. |
