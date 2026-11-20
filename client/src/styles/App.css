@@ -705,26 +705,70 @@ input.is-missing, textarea.is-missing { border-style: dashed; border-color: var(
 
 select { appearance: none; cursor: pointer; padding-right: 2.4rem; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%2325332F' stroke-width='2'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .8rem center; background-size: 16px; }
 
-/* ---------- Landing: journey ---------- */
+/* ---------- Landing: journey flow chart ---------- */
 .journey { background: var(--white); }
-.journey__track {
-  list-style: none; display: grid; grid-template-columns: repeat(7, 1fr); gap: .75rem;
-  counter-reset: journey;
+.flow { --gap: 1rem; --node: 3rem; position: relative; }
+.flow__phases, .flow__steps, .flow__loop { display: grid; grid-template-columns: repeat(7, 1fr); column-gap: var(--gap); }
+
+/* Phase brackets above the nodes */
+.flow__phases { margin-bottom: 1.1rem; }
+.flow__phase {
+  position: relative; text-align: center; font-size: .78rem; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; padding-bottom: .65rem;
 }
-.journey__step {
-  position: relative; background: var(--ivory-2); border-radius: var(--r-md);
-  padding: 1.1rem 1rem 1.2rem; border-top: 4px solid var(--teal);
+.flow__phase::after {
+  content: ''; position: absolute; left: 6%; right: 6%; bottom: 0; height: .55rem;
+  border: 2px solid currentColor; border-bottom: none; border-radius: 8px 8px 0 0; opacity: .55;
 }
-.journey__step--coral { border-top-color: var(--coral); }
-.journey__step--mango { border-top-color: var(--mango); }
-.journey__step--teal { border-top-color: var(--teal); }
-.journey__step--indigo { border-top-color: var(--indigo); }
-.journey__num {
-  display: inline-grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: 50%;
-  background: var(--white); border: 1.5px solid var(--line-strong); font-weight: 800; font-size: .85rem;
+.flow__phase--launch { grid-column: 1 / 5; color: var(--teal); }
+.flow__phase--grow { grid-column: 5 / 8; color: var(--coral-600); }
+.flow__phase-inline { display: none; }
+
+/* Steps: node + connector arrow to the next node */
+.flow__steps { list-style: none; }
+.flow__step { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.flow__node {
+  position: relative; z-index: 1; display: grid; place-items: center;
+  width: var(--node); height: var(--node); border-radius: 50%;
+  background: var(--white); border: 3px solid var(--teal); font-weight: 800; font-size: 1.05rem; color: var(--ink);
+  box-shadow: 0 0 0 6px var(--white);
 }
-.journey__step h3 { font-size: 1.1rem; margin: .6rem 0 .3rem; }
-.journey__step p { font-size: .88rem; color: var(--ink-2); line-height: 1.5; }
+.flow__step--coral .flow__node { border-color: var(--coral); }
+.flow__step--mango .flow__node { border-color: var(--mango); }
+.flow__step--teal .flow__node { border-color: var(--teal); }
+.flow__step--indigo .flow__node { border-color: var(--indigo); background: var(--indigo); color: var(--white); }
+.flow__step:not(:last-child)::after {           /* line */
+  content: ''; position: absolute; top: calc(var(--node) / 2 - 1px); height: 2px; background: var(--line-strong);
+  left: calc(50% + var(--node) / 2 + 4px); right: calc(-50% - var(--gap) + var(--node) / 2 + 10px);
+}
+.flow__step:not(:last-child)::before {          /* arrowhead */
+  content: ''; position: absolute; top: calc(var(--node) / 2 - 5px);
+  right: calc(-50% - var(--gap) + var(--node) / 2 + 4px);
+  border: 5px solid transparent; border-left: 7px solid var(--line-strong); border-right: none;
+}
+.flow__step:nth-child(4)::after { background: var(--indigo); }   /* Publish → Connect: the launch moment */
+.flow__step:nth-child(4)::before { border-left-color: var(--indigo); }
+.flow__text h3 { font-size: 1.08rem; margin: .8rem 0 .3rem; }
+.flow__text p { font-size: .86rem; color: var(--ink-2); line-height: 1.5; padding: 0 .15rem; }
+
+/* Return loop: from Update (col 7) back to Approve (col 3) */
+.flow__loop { margin-top: .9rem; }
+.flow__loop-path {
+  --col: calc((100% - 4 * var(--gap)) / 5);
+  grid-column: 3 / 8; position: relative; height: 2.6rem;
+  margin: 0 calc(var(--col) / 2);
+  border: 2px dashed var(--teal); border-top: none; border-radius: 0 0 18px 18px;
+}
+.flow__loop-path::before {                      /* arrowhead pointing up into Approve */
+  content: ''; position: absolute; left: -7px; top: -8px;
+  border: 6px solid transparent; border-bottom: 9px solid var(--teal); border-top: none;
+}
+.flow__loop-label {
+  position: absolute; left: 50%; bottom: -0.85rem; transform: translateX(-50%);
+  display: inline-flex; align-items: center; gap: .45rem; white-space: nowrap;
+  background: var(--teal-50); color: var(--teal); font-size: .84rem; font-weight: 700;
+  padding: .35rem .85rem; border-radius: 999px; border: 1px solid rgba(20, 91, 85, .2);
+}
 
 /* ---------- Landing: plans ---------- */
 .plans { background: var(--ivory); }
@@ -787,7 +831,9 @@ select { appearance: none; cursor: pointer; padding-right: 2.4rem; background-im
    Responsive
    ========================================================= */
 @media (max-width: 1024px) {
-  .journey__track { grid-template-columns: repeat(4, 1fr); }
+  .flow { --gap: .6rem; --node: 2.6rem; }
+  .flow__text p { font-size: .8rem; }
+  .flow__loop-label { white-space: normal; text-align: center; width: max-content; max-width: 90%; }
   .plans__grid { grid-template-columns: 1fr 1fr; }
   .plan--free { grid-column: 1 / -1; }
   .hero { grid-template-columns: 1fr; }
@@ -812,7 +858,27 @@ select { appearance: none; cursor: pointer; padding-right: 2.4rem; background-im
   .site-nav__cta { gap: .6rem; }
   .site-nav__cta .label-long { display: none; }
   .site-nav__cta .label-short { display: inline; }
-  .journey__track { grid-template-columns: 1fr 1fr; }
+  /* Flow chart becomes a vertical timeline */
+  .flow__phases, .flow__loop { display: none; }
+  .flow__steps { grid-template-columns: 1fr; row-gap: 1.1rem; }
+  .flow__step { flex-direction: row; flex-wrap: wrap; align-items: flex-start; text-align: left; gap: 0 1rem; }
+  .flow__step:not(:last-child)::after {
+    top: calc(var(--node) + 4px); bottom: calc(-1.1rem - 4px); left: calc(var(--node) / 2 - 1px); right: auto;
+    width: 2px; height: auto;
+  }
+  .flow__step:not(:last-child)::before { display: none; }
+  .flow__text { flex: 1; min-width: 0; }
+  .flow__text h3 { margin-top: .55rem; }
+  .flow__phase-inline {
+    display: block; width: 100%; margin-bottom: .6rem; font-size: .72rem; font-weight: 800;
+    letter-spacing: .08em; text-transform: uppercase; color: var(--teal);
+  }
+  .flow__step:nth-child(5) .flow__phase-inline { color: var(--coral-600); margin-top: .4rem; }
+  .flow__step:last-child::after {
+    content: '↺  Changes go live only when you approve them'; position: static; display: block;
+    width: 100%; margin: .9rem 0 0; padding: .55rem .85rem; height: auto;
+    background: var(--teal-50); color: var(--teal); font-size: .84rem; font-weight: 700; border-radius: var(--r-sm);
+  }
   .plans__grid { grid-template-columns: 1fr; }
   .site-nav__links, .workspace-nav__tag { display: none; }
   .stepper__label { display: none; }

@@ -14,11 +14,11 @@ function scrollToId(id) {
 
 // The full owner journey, Describe → Update
 const JOURNEY = [
-  { title: 'Describe', line: 'Tell us about your business in everyday words.', tone: 'coral' },
+  { title: 'Describe', line: 'Tell us about your business in everyday words.', tone: 'coral', phase: 'Launch · once' },
   { title: 'Organise', line: 'AI drafts your profile and catalogue — and asks about anything missing.', tone: 'mango' },
   { title: 'Approve', line: 'You check every detail and choose what customers see.', tone: 'teal' },
   { title: 'Publish', line: 'Your business page goes live on a link you can share.', tone: 'indigo' },
-  { title: 'Connect', line: 'Customers send enquiries straight from your business page.', tone: 'coral' },
+  { title: 'Connect', line: 'Customers send enquiries straight from your business page.', tone: 'coral', phase: 'Grow · every day' },
   { title: 'Manage', line: 'Enquiries collect in your inbox — mark them replied or closed.', tone: 'mango' },
   { title: 'Update', line: 'Change prices and products any time; publish when you\'re ready.', tone: 'teal' }
 ]
@@ -250,15 +250,35 @@ export default function LandingPage() {
               keep it current as your products, prices and seasons change.
             </p>
           </div>
-          <ol className="journey__track">
-            {JOURNEY.map((s, i) => (
-              <li key={s.title} className={`journey__step journey__step--${s.tone}`}>
-                <span className="journey__num">{i + 1}</span>
-                <h3>{s.title}</h3>
-                <p>{s.line}</p>
-              </li>
-            ))}
-          </ol>
+          <div className="flow" role="group" aria-label="How Bizdwaar works, from Describe to Update">
+            {/* Phase brackets (desktop) */}
+            <div className="flow__phases" aria-hidden="true">
+              <span className="flow__phase flow__phase--launch">Launch · once</span>
+              <span className="flow__phase flow__phase--grow">Grow · every day</span>
+            </div>
+
+            <ol className="flow__steps">
+              {JOURNEY.map((s, i) => (
+                <li key={s.title} className={`flow__step flow__step--${s.tone}`}>
+                  {s.phase && <span className="flow__phase-inline">{s.phase}</span>}
+                  <span className="flow__node" aria-hidden="true">{i + 1}</span>
+                  <div className="flow__text">
+                    <h3><span className="sr-only">Step {i + 1}: </span>{s.title}</h3>
+                    <p>{s.line}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+
+            {/* Return path: updates go back through approval before going live */}
+            <div className="flow__loop">
+              <div className="flow__loop-path">
+                <span className="flow__loop-label">
+                  <LoopIcon /> Update → Approve → Publish: changes go live only when you approve them
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -448,6 +468,13 @@ function ExternalIcon() {
   return (
     <svg className="icon" viewBox="0 0 24 24" aria-hidden="true" style={{ width: '1em', height: '1em' }}>
       <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+function LoopIcon() {
+  return (
+    <svg className="icon" viewBox="0 0 24 24" aria-hidden="true" style={{ width: '1.05em', height: '1.05em' }}>
+      <path d="M4 12a8 8 0 0 1 13.7-5.6L20 8.7M20 4v4.7h-4.7M20 12a8 8 0 0 1-13.7 5.6L4 15.3M4 20v-4.7h4.7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
