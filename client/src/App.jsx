@@ -6,6 +6,8 @@ import OwnerReview from './pages/OwnerReview'
 import OwnerInbox from './pages/OwnerInbox'
 import PublicStorefront from './pages/PublicStorefront'
 import EnquiryForm from './pages/EnquiryForm'
+import { Logo, LogoMark } from './components/Brand'
+import { startSession, listMyBusinesses } from './api/owner'
 import './styles/App.css'
 
 // -------------------------------------------------------
@@ -41,37 +43,69 @@ function useRoute() {
   return location
 }
 
-function navigate(path) {
-  window.history.pushState({}, '', path)
-  window.dispatchEvent(new PopStateEvent('popstate'))
-}
-
 // -------------------------------------------------------
-// Owner flow progress bar
+// Owner workspace chrome
 // -------------------------------------------------------
-const STEPS = ['login', 'onboarding', 'review', 'published', 'inbox']
-const STEP_LABELS = { login: 'Sign in', onboarding: 'Describe', review: 'Review', published: 'Published' }
+const STEPS = [
+  { key: 'onboarding', label: 'Describe' },
+  { key: 'review', label: 'Review' },
+  { key: 'published', label: 'Publish' }
+]
 
-function ProgressBar({ step }) {
-  const display = ['login', 'onboarding', 'review', 'published']
-  const currentIndex = display.indexOf(step === 'inbox' ? 'published' : step)
+function Stepper({ step }) {
+  const current = STEPS.findIndex(s => s.key === (step === 'inbox' ? 'published' : step))
   return (
-    <div className="progress-bar">
-      {display.map((s, i) => {
-        const state = i < currentIndex ? 'done' : i === currentIndex ? 'active' : ''
+    <ol className="stepper" aria-label="Progress">
+      {STEPS.map((s, i) => {
+        const state = i < current ? 'done' : i === current ? 'active' : 'todo'
         return (
-          <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
-            <span className={`progress-step ${state}`}>
-              <span className="progress-step-num">
-                {i < currentIndex ? '✓' : i + 1}
-              </span>
-              <span style={{ display: 'none' }}>{STEP_LABELS[s]}</span>
-            </span>
-            {i < display.length - 1 && <span className="progress-divider" />}
-          </span>
+          <li key={s.key} className={`stepper__item is-${state}`} aria-current={state === 'active' ? 'step' : undefined}>
+            <span className="stepper__dot">{state === 'done' ? '✓' : i + 1}</span>
+            <span className="stepper__label">{s.label}</span>
+          </li>
         )
       })}
+    </ol>
+  )
+}
+
+function OwnerShell({ step, showStepper = true, children }) {
+  return (
+    <div className="workspace">
+      <nav className="workspace-nav">
+        <Logo />
+        {showStepper && <Stepper step={step} />}
+        <span className="workspace-nav__tag">Owner workspace</span>
+      </nav>
+      <main className="workspace-main">{children}</main>
     </div>
+  )
+}
+
+// Storefronts this browser session has created — lets returning owners pick up where they left off
+function MyStorefronts({ businesses, onOpen }) {
+  if (!businesses || businesses.length === 0) return null
+  return (
+    <section className="my-stores">
+      <div className="my-stores__head">
+        <h2>Welcome back</h2>
+        <p>Continue with a storefront you started in this browser, or create a new one below.</p>
+      </div>
+      <div className="my-stores__list">
+        {businesses.map(b => (
+          <button key={b.id} type="button" className="store-tile" onClick={() => onOpen(b)}>
+            <span className="sf-monogram">{(b.name || '?').charAt(0).toUpperCase()}</span>
+            <span className="store-tile__name">{b.name}</span>
+            <span className={`status-pill status-pill--${b.status}`}>
+              {b.status === 'published' ? 'Live' : 'Draft'}
+            </span>
+          </button>
+        ))}
+      </div>
+      <p className="my-stores__note">
+        Storefronts are managed from the browser they were created in during this hackathon version.
+      </p>
+    </section>
   )
 }
 
@@ -79,18 +113,65 @@ function ProgressBar({ step }) {
 // Owner flow state machine
 // -------------------------------------------------------
 function OwnerFlow() {
-  const [step, setStep] = useState('login')
+  // Admin token screen is only reachable at /owner/admin; regular visitors start at onboarding
+  const isAdminPath = window.location.pathname.replace(/\/+$/, '') === '/owner/admin'
+  const [step, setStep] = useState(isAdminPath ? 'login' : 'onboarding')
   const [businessId, setBusinessId] = useState(null)
   const [publishedSlug, setPublishedSlug] = useState(null)
   const [publishedBusinessId, setPublishedBusinessId] = useState(null)
+  const [publishedName, setPublishedName] = useState('')
   const [copyFeedback, setCopyFeedback] = useState('')
+  const [session, setSession] = useState('starting') // 'starting' | 'ready' | 'error'
+  const [sessionError, setSessionError] = useState('')
+  const [myBusinesses, setMyBusinesses] = useState([])
+
+  async function initSession() {
+    setSession('starting')
+    setSessionError('')
+    try {
+      const res = await startSession()
+      if (!res.ok) throw new Error(res.message || 'Could not start your session.')
+      const list = await listMyBusinesses()
+      setMyBusinesses(list.ok ? (list.businesses || []) : [])
+      setSession('ready')
+    } catch (err) {
+      setSessionError(err.message || 'Network error — could not start your session.')
+      setSession('error')
+    }
+  }
+
+  useEffect(() => { initSession() }, [])
+  useEffect(() => { window.scrollTo(0, 0) }, [step])
+
+  function openExisting(b) {
+    setBusinessId(b.id)
+    if (b.status === 'published') {
+      setPublishedSlug(b.slug)
+      setPublishedBusinessId(b.id)
+      setPublishedName(b.name)
+      setStep('published')
+    } else {
+      setStep('review')
+    }
+  }
+
+  function startNew() {
+    setStep('onboarding')
+    setBusinessId(null)
+    setPublishedSlug(null)
+    setPublishedBusinessId(null)
+    setPublishedName('')
+    // Refresh the list so the storefront just published shows under "Welcome back"
+    listMyBusinesses().then(list => { if (list.ok) setMyBusinesses(list.businesses || []) }).catch(() => {})
+  }
 
   function copyLink(url) {
+    const done = () => {
+      setCopyFeedback('Link copied')
+      setTimeout(() => setCopyFeedback(''), 2000)
+    }
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(url).then(() => {
-        setCopyFeedback('Copied!')
-        setTimeout(() => setCopyFeedback(''), 2000)
-      })
+      navigator.clipboard.writeText(url).then(done)
     } else {
       // fallback
       const ta = document.createElement('textarea')
@@ -101,145 +182,111 @@ function OwnerFlow() {
       ta.select()
       document.execCommand('copy')
       document.body.removeChild(ta)
-      setCopyFeedback('Copied!')
-      setTimeout(() => setCopyFeedback(''), 2000)
+      done()
     }
   }
 
   if (step === 'login') {
     return (
-      <div className="owner-flow">
-        <nav className="nav-bar">
-          <button
-            className="nav-logo"
-            onClick={() => navigate('/')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            Bizdwaar
-          </button>
-        </nav>
+      <OwnerShell step="onboarding" showStepper={false}>
         <OwnerLogin onLogin={() => setStep('onboarding')} />
-      </div>
+      </OwnerShell>
     )
   }
 
   if (step === 'onboarding') {
     return (
-      <div className="owner-flow">
-        <nav className="nav-bar">
-          <button
-            className="nav-logo"
-            onClick={() => navigate('/')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            Bizdwaar
-          </button>
-          <ProgressBar step="onboarding" />
-        </nav>
-        <Onboarding
-          onCreated={(id) => {
-            setBusinessId(id)
-            setStep('review')
-          }}
-        />
-      </div>
+      <OwnerShell step="onboarding">
+        {session === 'starting' && (
+          <div className="state-panel">
+            <span className="spinner" aria-hidden="true" />
+            <p>Opening your workspace…</p>
+          </div>
+        )}
+        {session === 'error' && (
+          <div className="state-panel state-panel--error">
+            <h2>We couldn't open your workspace</h2>
+            <p>{sessionError}</p>
+            <button type="button" className="btn btn--primary" onClick={initSession}>Try again</button>
+          </div>
+        )}
+        {session === 'ready' && (
+          <>
+            <MyStorefronts businesses={myBusinesses} onOpen={openExisting} />
+            <Onboarding
+              onCreated={(id) => {
+                setBusinessId(id)
+                setStep('review')
+              }}
+            />
+          </>
+        )}
+      </OwnerShell>
     )
   }
 
   if (step === 'review') {
     return (
-      <div className="owner-flow">
-        <nav className="nav-bar">
-          <button
-            className="nav-logo"
-            onClick={() => navigate('/')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            Bizdwaar
-          </button>
-          <ProgressBar step="review" />
-        </nav>
+      <OwnerShell step="review">
         <OwnerReview
           businessId={businessId}
-          onPublished={(slug) => {
+          onPublished={(slug, name) => {
             setPublishedSlug(slug)
             setPublishedBusinessId(businessId)
+            setPublishedName(name || '')
             setStep('published')
           }}
         />
-      </div>
+      </OwnerShell>
     )
   }
 
   if (step === 'inbox') {
     return (
-      <div className="owner-flow">
-        <nav className="nav-bar">
-          <button
-            className="nav-logo"
-            onClick={() => navigate('/')}
-            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            Bizdwaar
-          </button>
-        </nav>
+      <OwnerShell step="inbox">
         <OwnerInbox
           businessId={publishedBusinessId}
-          businessName={publishedSlug}
+          businessName={publishedName || publishedSlug}
+          storefrontUrl={`${window.location.origin}/s/${publishedSlug}`}
           onBack={() => setStep('published')}
         />
-      </div>
+      </OwnerShell>
     )
   }
 
   if (step === 'published') {
     const url = `${window.location.origin}/s/${publishedSlug}`
     return (
-      <div className="published-screen">
-        <div className="published-card">
-          <h2>Your storefront is live</h2>
-          <p className="hint">Share this link with your customers:</p>
-          <a href={url} target="_blank" rel="noreferrer" className="storefront-link">{url}</a>
-
-          <div className="published-actions">
-            <a
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className="btn-primary"
-              style={{ textAlign: 'center' }}
-            >
-              View my storefront →
-            </a>
-
-            <button
-              className="btn-ghost"
-              onClick={() => copyLink(url)}
-            >
-              {copyFeedback || 'Copy link'}
-            </button>
-
-            <button
-              className="btn-secondary"
-              onClick={() => setStep('inbox')}
-            >
-              View enquiries
-            </button>
-
-            <button
-              className="btn-secondary"
-              onClick={() => {
-                setStep('onboarding')
-                setBusinessId(null)
-                setPublishedSlug(null)
-                setPublishedBusinessId(null)
-              }}
-            >
-              Create another storefront
-            </button>
+      <OwnerShell step="published">
+        <section className="published">
+          <div className="published__art" aria-hidden="true">
+            <div className="published__arch"><LogoMark size={56} /></div>
           </div>
-        </div>
-      </div>
+          <div className="published__body">
+            <p className="eyebrow eyebrow--coral">You're live</p>
+            <h1 className="display display--md">
+              {publishedName ? <>{publishedName} is open for business.</> : <>Your storefront is open for business.</>}
+            </h1>
+            <p className="lede">Share this link anywhere your customers already are — chats, social profiles, product labels.</p>
+
+            <div className="link-box">
+              <a href={url} target="_blank" rel="noreferrer" className="link-box__url">{url.replace(/^https?:\/\//, '')}</a>
+              <button type="button" className="btn btn--dark btn--sm" onClick={() => copyLink(url)}>
+                {copyFeedback || 'Copy link'}
+              </button>
+            </div>
+
+            <div className="published__actions">
+              <a href={url} target="_blank" rel="noreferrer" className="btn btn--primary">View my storefront</a>
+              <button type="button" className="btn btn--ghost" onClick={() => setStep('inbox')}>View enquiries</button>
+              <button type="button" className="btn btn--ghost" onClick={() => { setBusinessId(publishedBusinessId); setStep('review') }}>
+                Edit storefront
+              </button>
+              <button type="button" className="btn btn--text" onClick={startNew}>Create another storefront</button>
+            </div>
+          </div>
+        </section>
+      </OwnerShell>
     )
   }
 

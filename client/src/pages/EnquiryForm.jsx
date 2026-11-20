@@ -1,10 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { LogoMark } from '../components/Brand'
+import { navigate } from '../lib/navigate'
 import '../styles/App.css'
-
-function navigate(path) {
-  window.history.pushState({}, '', path)
-  window.dispatchEvent(new PopStateEvent('popstate'))
-}
+import '../styles/Storefront.css'
 
 export default function EnquiryForm({ businessSlug }) {
   const [form, setForm] = useState({
@@ -18,6 +16,15 @@ export default function EnquiryForm({ businessSlug }) {
   const [success, setSuccess] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [error, setError] = useState('')
+  const [businessName, setBusinessName] = useState('')
+
+  // Show the business name in the header (public, owner-approved data only)
+  useEffect(() => {
+    fetch(`/api/businesses/${encodeURIComponent(businessSlug)}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.ok) setBusinessName(d.business.name) })
+      .catch(() => {})
+  }, [businessSlug])
 
   function update(field, value) {
     setForm(f => ({ ...f, [field]: value }))
@@ -57,18 +64,22 @@ export default function EnquiryForm({ businessSlug }) {
     }
   }
 
+  const name = businessName || 'this business'
+  const back = (
+    <button type="button" className="btn btn--text" onClick={() => navigate(`/s/${businessSlug}`)}>
+      ← Back to {businessName || 'storefront'}
+    </button>
+  )
+
   if (success) {
     return (
-      <div className="page-center">
-        <div className="card">
-          <h2 style={{ marginBottom: '0.75rem' }}>Enquiry received</h2>
-          <p className="hint">{successMessage}</p>
-          <button
-            className="btn-secondary"
-            style={{ marginTop: '1rem' }}
-            onClick={() => navigate(`/s/${businessSlug}`)}
-          >
-            ← Back to storefront
+      <div className="enquiry enquiry--done">
+        <div className="enquiry-done">
+          <div className="enquiry-done__mark" aria-hidden="true">✓</div>
+          <h1 className="h-page">Enquiry received</h1>
+          <p className="lede">{successMessage}</p>
+          <button type="button" className="btn btn--primary" onClick={() => navigate(`/s/${businessSlug}`)}>
+            Back to {businessName || 'storefront'}
           </button>
         </div>
       </div>
@@ -76,46 +87,70 @@ export default function EnquiryForm({ businessSlug }) {
   }
 
   return (
-    <div className="page">
-      <div className="card wide">
-        <h2>Send an enquiry</h2>
-        <p className="hint">Fill in your details and the owner will get back to you.</p>
-        <form onSubmit={handleSubmit} className="form">
-          <label htmlFor="customerName">Your name *</label>
-          <input
-            id="customerName"
-            value={form.customerName}
-            onChange={e => update('customerName', e.target.value)}
-            placeholder="Your full name"
-            required
-          />
+    <div className="enquiry">
+      <aside className="enquiry__side">
+        {back}
+        <p className="eyebrow eyebrow--mango">Send an enquiry</p>
+        <h1 className="enquiry__title">Message {name}</h1>
+        <p>Ask about products, prices, custom orders or delivery. Your message is delivered to the owner's Bizdwaar inbox.</p>
+        <ul className="enquiry__points">
+          <li>Share an email or phone so they can reply.</li>
+          <li>Be specific — quantities and dates help the owner answer quickly.</li>
+        </ul>
+        <p className="enquiry__powered"><LogoMark size={18} /> Powered by Bizdwaar</p>
+      </aside>
 
-          <label htmlFor="customerEmail">Your email</label>
-          <input
-            id="customerEmail"
-            type="email"
-            value={form.customerEmail}
-            onChange={e => update('customerEmail', e.target.value)}
-            placeholder="your@email.com (optional)"
-          />
+      <main className="enquiry__main">
+        <form onSubmit={handleSubmit} className="enquiry__form">
+          <div className="field">
+            <label htmlFor="customerName">Your name <span className="req">*</span></label>
+            <input
+              id="customerName"
+              value={form.customerName}
+              onChange={e => update('customerName', e.target.value)}
+              placeholder="Your full name"
+              maxLength={200}
+              required
+            />
+          </div>
 
-          <label htmlFor="customerPhone">Your phone</label>
-          <input
-            id="customerPhone"
-            value={form.customerPhone}
-            onChange={e => update('customerPhone', e.target.value)}
-            placeholder="+91 98765 43210 (optional)"
-          />
+          <div className="field-pair">
+            <div className="field">
+              <label htmlFor="customerEmail">Email</label>
+              <input
+                id="customerEmail"
+                type="email"
+                value={form.customerEmail}
+                onChange={e => update('customerEmail', e.target.value)}
+                placeholder="you@example.com"
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="customerPhone">Phone</label>
+              <input
+                id="customerPhone"
+                value={form.customerPhone}
+                onChange={e => update('customerPhone', e.target.value)}
+                placeholder="+91 98765 43210"
+                maxLength={50}
+              />
+            </div>
+          </div>
 
-          <label htmlFor="message">Your message *</label>
-          <textarea
-            id="message"
-            value={form.message}
-            onChange={e => update('message', e.target.value)}
-            placeholder="What would you like to know or order?"
-            rows={6}
-            required
-          />
+          <div className="field">
+            <label htmlFor="message">Your message <span className="req">*</span></label>
+            <textarea
+              id="message"
+              value={form.message}
+              onChange={e => update('message', e.target.value)}
+              placeholder="Hi! I'd like to know more about…"
+              rows={6}
+              minLength={10}
+              maxLength={2000}
+              required
+            />
+            <p className="field__help">At least 10 characters.</p>
+          </div>
 
           {/* Honeypot — hidden from normal users */}
           <input
@@ -126,23 +161,16 @@ export default function EnquiryForm({ businessSlug }) {
             style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px' }}
             tabIndex={-1}
             autoComplete="off"
+            aria-hidden="true"
           />
 
-          {error && <p className="error">{error}</p>}
+          {error && <p className="alert alert--error" role="alert">{error}</p>}
 
-          <button type="submit" disabled={loading} className="btn-primary">
+          <button type="submit" disabled={loading} className="btn btn--primary btn--lg btn--block">
             {loading ? 'Sending…' : 'Send enquiry'}
           </button>
         </form>
-
-        <button
-          className="btn-secondary"
-          style={{ marginTop: '1rem' }}
-          onClick={() => navigate(`/s/${businessSlug}`)}
-        >
-          ← Back to storefront
-        </button>
-      </div>
+      </main>
     </div>
   )
 }

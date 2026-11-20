@@ -5,10 +5,10 @@ function formatDate(dateStr) {
   if (!dateStr) return ''
   const d = new Date(dateStr)
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) +
-    ' ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+    ' · ' + d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
 }
 
-export default function OwnerInbox({ businessId, businessName, onBack }) {
+export default function OwnerInbox({ businessId, businessName, storefrontUrl, onBack }) {
   const [enquiries, setEnquiries] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -30,45 +30,64 @@ export default function OwnerInbox({ businessId, businessName, onBack }) {
   }, [businessId])
 
   return (
-    <div className="inbox-page">
-      <button className="btn-secondary" style={{ marginBottom: '1.5rem' }} onClick={onBack}>
-        ← Back to storefront settings
-      </button>
+    <div className="inbox">
+      <button type="button" className="btn btn--text" onClick={onBack}>← Back to storefront settings</button>
 
-      <h2>Enquiries</h2>
-      {businessName && <p className="hint" style={{ marginBottom: 0 }}>{businessName}</p>}
+      <header className="page-head">
+        <div>
+          <p className="eyebrow eyebrow--coral">Inbox</p>
+          <h1 className="h-page">Customer enquiries</h1>
+          {businessName && <p className="lede">Messages sent to {businessName} from your storefront.</p>}
+        </div>
+        {!loading && !error && enquiries.length > 0 && (
+          <span className="status-pill status-pill--published">{enquiries.length} message{enquiries.length === 1 ? '' : 's'}</span>
+        )}
+      </header>
 
-      {loading && <p className="hint" style={{ marginTop: '2rem' }}>Loading enquiries…</p>}
+      {loading && (
+        <div className="state-panel">
+          <span className="spinner" aria-hidden="true" />
+          <p>Loading enquiries…</p>
+        </div>
+      )}
 
-      {error && <p className="error" style={{ marginTop: '1rem' }}>{error}</p>}
+      {error && (
+        <div className="state-panel state-panel--error">
+          <h2>We couldn't load your inbox</h2>
+          <p>{error}</p>
+        </div>
+      )}
 
       {!loading && !error && enquiries.length === 0 && (
         <div className="inbox-empty">
-          <p style={{ fontSize: '2rem', marginBottom: '0.75rem' }}>📭</p>
-          <p>No enquiries yet. Share your storefront link to start receiving messages.</p>
+          <div className="inbox-empty__arch" aria-hidden="true" />
+          <h2>No enquiries yet</h2>
+          <p>Share your storefront link with customers — their messages will appear here.</p>
+          {storefrontUrl && (
+            <a className="btn btn--primary" href={storefrontUrl} target="_blank" rel="noreferrer">Open my storefront</a>
+          )}
         </div>
       )}
 
       {!loading && enquiries.length > 0 && (
         <div className="inbox-list">
           {enquiries.map(enq => (
-            <div key={enq.id} className="enquiry-card">
-              <div className="enquiry-card-header">
-                <span className="enquiry-customer">{enq.customerName}</span>
-                <span className="enquiry-date">{formatDate(enq.createdAt)}</span>
+            <article key={enq.id} className="message-card">
+              <div className="message-card__head">
+                <span className="sf-monogram">{(enq.customerName || '?').charAt(0).toUpperCase()}</span>
+                <div>
+                  <strong>{enq.customerName}</strong>
+                  <span className="message-card__date">{formatDate(enq.createdAt)}</span>
+                </div>
               </div>
+              <p className="message-card__body">{enq.message}</p>
               {(enq.customerEmail || enq.customerPhone) && (
-                <div className="enquiry-contact">
-                  {enq.customerEmail && (
-                    <a href={`mailto:${enq.customerEmail}`}>{enq.customerEmail}</a>
-                  )}
-                  {enq.customerPhone && (
-                    <a href={`tel:${enq.customerPhone}`}>{enq.customerPhone}</a>
-                  )}
+                <div className="message-card__contact">
+                  {enq.customerEmail && <a className="btn btn--ghost btn--sm" href={`mailto:${enq.customerEmail}`}>Reply by email</a>}
+                  {enq.customerPhone && <a className="btn btn--ghost btn--sm" href={`tel:${enq.customerPhone}`}>Call {enq.customerPhone}</a>}
                 </div>
               )}
-              <p className="enquiry-message">{enq.message}</p>
-            </div>
+            </article>
           ))}
         </div>
       )}
