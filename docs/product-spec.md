@@ -64,8 +64,10 @@ missing price is shown as "Price on request". No currency conversion is ever app
 ## Business model
 
 - **Free:** a Bizdwaar-hosted business page with everything above.
-- **Planned paid upgrade:** the owner's own custom domain (bought via GoDaddy, owned by the owner).
-- **Planned premium service:** website setup and customisation.
+- **Paid upgrade — own domain:** the homepage links to GoDaddy domain search; the owner buys and owns the domain.
+  Connecting it to the Bizdwaar page is planned.
+- **Premium service — custom website:** owners enquire by email (sakshi.m@bizdwaar.in) from the homepage; the
+  team builds the site as a manual service.
 
 ## P0 scope (mandatory for judged MVP)
 

@@ -121,16 +121,19 @@ Bizdwaar targets Indian micro-businesses, so every price is in **Indian Rupees**
 | Owner pages and enquiries available from any device after login | ✅ Implemented |
 | Administrator view of all business pages (`/owner/admin`) | ✅ Implemented (needs a 32+ character `OWNER_ADMIN_TOKEN`) |
 | Owner photo uploads | ❌ Not built — see *Images* under Known limitations |
-| **Own custom domain** (search, buy via GoDaddy, connect) | 🗺️ Planned, not built |
-| **Premium website setup and customisation** | 🗺️ Planned, not built |
+| **Own domain** — "Find a domain on GoDaddy" link on the homepage | ✅ Link to GoDaddy domain search (the owner buys it on GoDaddy) |
+| Connecting a bought domain to the Bizdwaar page | 🗺️ Planned, not built |
+| **Custom website** — "Enquire about a custom website" on the homepage | ✅ Email enquiry to the Bizdwaar team (sakshi.m@bizdwaar.in); the build itself is a manual service |
 | Payments, orders, inventory, analytics | ❌ Out of scope |
 
 ### Business model
 
 - **Free business page** on `bizdwaar.in/s/your-business` — everything marked ✅ above.
-- **Own domain** (planned) — an optional paid upgrade. The domain belongs to the owner; registration and renewal
-  fees would be shown from GoDaddy at purchase time. Nothing is integrated yet and no prices are assumed.
-- **Premium website setup** (planned) — help setting up and personalising a fuller website.
+- **Own domain** — an optional paid upgrade. Today the homepage links to GoDaddy's domain search, where the owner
+  buys a domain in their own name at GoDaddy's prices. Connecting it to the Bizdwaar page is planned; no
+  partnership, commission or prices are assumed.
+- **Custom website** — a paid service: owners email the Bizdwaar team (sakshi.m@bizdwaar.in) from the homepage
+  and the team designs and builds a fuller site.
 
 ---
 

@@ -263,8 +263,8 @@ These are **planned** and do not exist in the code today.
 
 | Item | Notes |
 |---|---|
-| Own custom domain | Owner searches for a domain via GoDaddy and sees real availability and price, buys it in the owner's name, and Bizdwaar connects it to the business page. Fees would be disclosed; no partnership or commission is assumed. |
-| Premium website setup | Paid design and customisation, extra pages and galleries, hosting and maintenance. |
+| Connect own domain | Today the homepage links to GoDaddy domain search. Planned: show real availability and price in Bizdwaar, buy in the owner's name, and connect the domain to the business page. Fees would be disclosed; no partnership or commission is assumed. |
+| Custom website service | Today an email enquiry from the homepage. Planned: an in-app request form and project tracking. |
 | Phone / WhatsApp login | One-time codes by SMS or WhatsApp for owners without email. |
 | Owner photo uploads | Replace the illustrative imagery and branded tiles with the owner's own product photos (needs durable storage, size/type limits, EXIF stripping). |
 | Saved claim reviews | Persist the "I've reviewed this" ticks and enforce them on the server at publish. |

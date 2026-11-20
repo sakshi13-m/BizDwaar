@@ -23,17 +23,24 @@ const JOURNEY = [
   { title: 'Update', line: 'Change prices and products any time; publish when you\'re ready.', tone: 'teal' }
 ]
 
+// Hero collage: the kinds of businesses Bizdwaar is made for
+const HERO_TILES = [
+  { label: 'Home food', img: '/images/cat-food.jpg', alt: 'A tray of fresh jalebis at a sweet shop', tone: 'mango' },
+  { label: 'Crafts', img: '/images/cat-crafts.jpg', alt: 'Hand-made terracotta pottery laid out at a market', tone: 'coral' },
+  { label: 'Fashion', img: '/images/cat-fashion.jpg', alt: 'Colourful folded dupattas stacked at a market stall', tone: 'teal' }
+]
+
 const CATEGORIES = [
   {
     title: 'Homemade food',
     line: 'Pickles, sweets, tiffins and festive boxes from home kitchens.',
-    img: '/images/cat-food.jpg',
+    img: '/images/food-sweets-box.jpg',
     accent: 'mango'
   },
   {
     title: 'Handmade crafts',
     line: 'Pottery, candles, décor and gifts made by skilled hands.',
-    img: '/images/cat-crafts.jpg',
+    img: '/images/candle-diya.jpg',
     accent: 'coral'
   },
   {
@@ -43,6 +50,12 @@ const CATEGORIES = [
     accent: 'teal'
   }
 ]
+
+const DOMAIN_SEARCH_URL = 'https://www.godaddy.com/domains/domain-name-search'
+const CUSTOM_SITE_EMAIL = 'sakshi.m@bizdwaar.in'
+const CUSTOM_SITE_MAILTO = `mailto:${CUSTOM_SITE_EMAIL}?subject=${encodeURIComponent('Custom website enquiry')}&body=${encodeURIComponent(
+  'Hi Bizdwaar team,\n\nI would like a custom website for my business.\n\nBusiness name:\nMy Bizdwaar page (if any):\nWhat I need:\nBest way to reach me:\n'
+)}`
 
 export default function LandingPage() {
   // Show "Log in" only when email login is available on this server
@@ -70,7 +83,8 @@ export default function LandingPage() {
             <button type="button" className="btn btn--text" onClick={() => navigate('/owner?login=1')}>Log in</button>
           )}
           <button type="button" className="btn btn--primary btn--sm" onClick={() => navigate('/owner')}>
-            Create your business page
+            <span className="label-long">Create your business page</span>
+            <span className="label-short">Start free</span>
           </button>
         </div>
       </nav>
@@ -99,28 +113,16 @@ export default function LandingPage() {
           <p className="hero__note">Free business page · No sign-up forms · You approve everything</p>
         </div>
 
-        <div className="hero__media">
+        <div className="hero__media hero__media--collage">
           <div className="hero__shape" aria-hidden="true" />
-          <SmartImage
-            src="/images/hero-candle-stall.jpg"
-            alt="Rows of colourful hand-dipped candles hanging at a market stall"
-            className="hero__img arch"
-            initial="B"
-          />
-          <div className="hero__float hero__float--link">
-            <LogoMark size={22} />
-            <div>
-              <span className="float-label">Now live</span>
-              <span className="float-value">bizdwaar.in/s/saras-studio</span>
-            </div>
-          </div>
-          <div className="hero__float hero__float--enquiry">
-            <span className="dot dot--coral" />
-            <div>
-              <span className="float-label">New enquiry</span>
-              <span className="float-value">"Can I order 10 candles as wedding favours?"</span>
-            </div>
-          </div>
+          <ul className="hero-collage" aria-label="Businesses Bizdwaar is made for">
+            {HERO_TILES.map(t => (
+              <li key={t.label} className={`hero-collage__item hero-collage__item--${t.tone}`}>
+                <SmartImage src={t.img} alt={t.alt} className="hero-collage__img arch" initial={t.label.charAt(0)} />
+                <span className="hero-collage__label">{t.label}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       </header>
 
@@ -382,14 +384,27 @@ export default function LandingPage() {
               </button>
             </article>
             <article className="plan plan--later">
-              <span className="plan__tag plan__tag--soon">Planned · not available yet</span>
+              <span className="plan__tag plan__tag--soon">Upgrade · paid</span>
               <h3>Your own domain</h3>
-              <p>Search for and connect a domain such as <strong>sarasstudio.in</strong> as an optional paid upgrade. The domain would belong to you.</p>
+              <p>
+                Get a name like <strong>sarasstudio.in</strong> that belongs to you. Search and buy it on GoDaddy
+                today; connecting it to your Bizdwaar page is coming soon.
+              </p>
+              <a className="btn btn--ghost plan__btn" href={DOMAIN_SEARCH_URL} target="_blank" rel="noopener noreferrer">
+                Find a domain on GoDaddy <ExternalIcon />
+              </a>
             </article>
             <article className="plan plan--later">
-              <span className="plan__tag plan__tag--soon">Planned · not available yet</span>
-              <h3>Premium website setup</h3>
-              <p>Help from a person to set up and personalise a fuller website when your business is ready for it.</p>
+              <span className="plan__tag plan__tag--soon">Service · on request</span>
+              <h3>Custom website</h3>
+              <p>
+                Ready for more than one page? Our team can design and build a fuller website for your business.
+                Tell us what you need and we'll get back to you.
+              </p>
+              <a className="btn btn--ghost plan__btn" href={CUSTOM_SITE_MAILTO}>
+                Enquire about a custom website
+              </a>
+              <p className="plan__contact">or email <a href={CUSTOM_SITE_MAILTO}>{CUSTOM_SITE_EMAIL}</a></p>
             </article>
           </div>
         </div>
@@ -426,6 +441,13 @@ export function Arrow() {
   return (
     <svg className="icon icon--arrow" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M5 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+function ExternalIcon() {
+  return (
+    <svg className="icon" viewBox="0 0 24 24" aria-hidden="true" style={{ width: '1em', height: '1em' }}>
+      <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
