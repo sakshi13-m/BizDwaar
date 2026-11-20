@@ -116,8 +116,8 @@ Bizdwaar targets Indian micro-businesses, so every price is in **Indian Rupees**
 | Customer enquiries with product of interest | ✅ Implemented |
 | Owner inbox with status filters | ✅ Implemented |
 | Returning owners update their page (same browser) | ✅ Implemented |
-| Email notification of enquiries | ⚠️ Built, needs email provider setup — sent through Resend's HTTPS API to the owner's login email (or `ENQUIRY_TO`). GoDaddy blocks outbound SMTP, so nothing is delivered until `RESEND_API_KEY` is configured. The inbox is always the reliable channel. |
-| Owner login with an email one-time code, logout | ✅ Implemented — works in production once the email provider is configured |
+| Email notification of enquiries | ✅ Implemented — sent through Resend's HTTPS API (GoDaddy blocks outbound SMTP) to the owner's login email, or `ENQUIRY_TO` for pages without an account. Uses the same delivery path verified for login codes; the inbox remains the source of truth. |
+| Owner login with an email one-time code, logout | ✅ Implemented and verified in production (code received in a real inbox, login succeeded) |
 | Owner pages and enquiries available from any device after login | ✅ Implemented |
 | Administrator view of all business pages (`/owner/admin`) | ✅ Implemented (needs a 32+ character `OWNER_ADMIN_TOKEN`) |
 | Owner photo uploads | ❌ Not built — see *Images* under Known limitations |
@@ -333,11 +333,11 @@ Database migrations are additive and run automatically on startup. Details:
 
 ## Known limitations
 
-- **Login needs an email provider:** owners who never log in can manage their pages only from the browser that
-  created them. Email login works in production only after `RESEND_API_KEY` and a verified sender domain are
-  configured. Owners need an email address; phone/WhatsApp login is planned.
-- **Email delivery** has not yet been verified in production (GoDaddy blocks SMTP; the HTTPS provider must be
-  set up). Enquiries are always saved and visible in the inbox.
+- **Login is optional:** owners who never log in can manage their pages only from the browser that created them.
+  Login needs an email address; phone/WhatsApp login is planned.
+- **Email delivery** depends on Resend (GoDaddy blocks outbound SMTP). If the provider is unavailable, owners see
+  an honest "couldn't send" message and enquiries are still saved in the inbox. New sending domains can land in
+  spam at first.
 - **Claim review** is enforced in the owner interface, and the "reviewed" ticks are not saved between visits.
 - **Rate limiter** is in-memory (resets on restart) and relies on `TRUST_PROXY_HOPS` being set correctly.
 - **Images:** owners cannot upload photos yet. A product shows a labelled *illustrative* photo only when its own

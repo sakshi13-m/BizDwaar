@@ -41,8 +41,9 @@ gddy hosting deployment publish --app-id <APP_ID>
 # 6. Verify: https://bizdwaar.in/api/health is 200 and the homepage serves the new dist/assets hash
 ```
 
-The local `deploy.ps1` (git-ignored) automates steps 4–5. Keep the GoDaddy access token it uses out of the file
-(read it from an environment variable) and never commit it.
+The local `deploy.ps1` (git-ignored) automates steps 4–5. It reads the GoDaddy personal access token from the
+`GDDY_PAT` user environment variable — set it once with
+`[Environment]::SetEnvironmentVariable('GDDY_PAT', '<token>', 'User')` — and never stores it in the file.
 
 ## Environment variables to set in GoDaddy panel
 
@@ -104,5 +105,10 @@ never drop or rewrite data. Current list:
 2. Add the DNS records Resend shows (SPF/DKIM, usually TXT and CNAME) in GoDaddy DNS for `bizdwaar.in`; wait
    until Resend marks the domain verified.
 3. Create an API key with "sending access" and set `RESEND_API_KEY` and `EMAIL_FROM` in the GoDaddy environment.
-4. Test: request a login code at `/owner?login=1` with your own email.
+4. Restart the app (`gddy hosting app restart --app-id <APP_ID> --variant PUBLISH`, and PREVIEW) so it reads the
+   new secrets; `/api/owner/me` then reports `emailLogin: true` and the Log in buttons appear.
+5. Test: request a login code at `/owner?login=1` with your own email.
+
+Status (20 Nov 2026): `bizdwaar.in` verified in Resend (Tokyo region, records added via GoDaddy Domain Connect);
+login codes delivered to a real inbox and login succeeded in production.
 - Browsers may cache the previous build briefly after a deploy — hard refresh when checking.
