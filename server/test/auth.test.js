@@ -198,7 +198,7 @@ test('enquiry notifications go to the owner email', async () => {
   assert.equal((await call('POST', `/api/owner/businesses/${bizId}/publish`, { cookie: laptopLoggedIn })).status, 200)
   const slug = pool.tables.businesses.find(b => b.id === bizId).slug
   const before = sent.length
-  const e = await call('POST', '/api/enquiries', { body: { businessSlug: slug, customerName: 'Asha', message: 'Do you ship to Pune?' } })
+  const e = await call('POST', '/api/enquiries', { body: { businessSlug: slug, customerName: 'Asha', customerPhone: '9876543210', message: 'Do you ship to Pune?' } })
   assert.equal(e.status, 200)
   assert.match(e.json.message, /sent/)
   assert.equal(sent.length, before + 1)
@@ -235,4 +235,43 @@ test('/me reports whether email login is available', async () => {
   const r = await call('GET', '/api/owner/me')
   assert.equal(r.json.emailLogin, true)
   assert.equal(r.json.loggedIn, false)
+})
+
+test('publishing needs a verified owner email: anonymous publish is refused, then allowed after login claims the page', async () => {
+  const browser = await newBrowser()
+  const created = await call('POST', '/api/owner/businesses', { cookie: browser, body: { ...NEW_BIZ, businessName: 'Anon Shop' } })
+  assert.equal(created.status, 201)
+  const id = created.json.businessId
+  const save = await call('PUT', `/api/owner/businesses/${id}`, { cookie: browser, body: {
+    approvedProfile: { businessName: 'Anon Shop', description: 'Candles.' }, approvedCatalogue: []
+  } })
+  assert.equal(save.status, 200, 'drafts can be saved without an account')
+
+  const refused = await call('POST', `/api/owner/businesses/${id}/publish`, { cookie: browser })
+  assert.equal(refused.status, 403)
+  assert.equal(refused.json.error, 'login_required')
+  assert.equal(pool.tables.businesses.find(b => b.id === id).status, 'draft')
+
+  const r = await login(browser, 'anon-shop@example.com')
+  assert.equal(r.json.claimed, 1)
+  const ok = await call('POST', `/api/owner/businesses/${id}/publish`, { cookie: r.cookie })
+  assert.equal(ok.status, 200)
+  const row = pool.tables.businesses.find(b => b.id === id)
+  assert.equal(row.status, 'published')
+  assert.ok(row.owner_id, 'every live page has an owner account')
+})
+
+test('the administrator can publish a page without an owner account', async () => {
+  const browser = await newBrowser()
+  const created = await call('POST', '/api/owner/businesses', { cookie: browser, body: { ...NEW_BIZ, businessName: 'Admin Shop' } })
+  const id = created.json.businessId
+  await call('PUT', `/api/owner/businesses/${id}`, { cookie: browser, body: {
+    approvedProfile: { businessName: 'Admin Shop', description: 'Candles.' }, approvedCatalogue: []
+  } })
+  const login = await fetch(`${base}/api/owner/login`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '10.3.0.1' },
+    body: JSON.stringify({ token: ADMIN })
+  })
+  const adminCookie = login.headers.getSetCookie().find(c => c.startsWith('ownerToken=')).split(';')[0]
+  assert.equal((await call('POST', `/api/owner/businesses/${id}/publish`, { cookie: adminCookie })).status, 200)
 })

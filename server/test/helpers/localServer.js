@@ -42,10 +42,6 @@ Object.assign(process.env, {
   OWNER_ADMIN_TOKEN: process.env.LOCAL_ADMIN_TOKEN || 'local-admin-token-for-preview-only-0000'
 })
 
-// Emails (login codes, enquiry notifications) are printed here instead of being sent
-const { setEmailTransportForTests } = await import('../../services/emailService.js')
-setEmailTransportForTests(async (msg) => console.log(`
-[email to ${msg.to}] ${msg.subject}`))
 
 const { setPoolForTests } = await import('../../db.js')
 setPoolForTests(createFakePool())
@@ -79,6 +75,12 @@ await fetch(`${base}/api/enquiries`, {
   method: 'POST', headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ businessSlug: created.slug, customerName: 'Asha', customerEmail: 'asha@example.com', message: 'Can I order 10 jar candles as wedding favours?', productName: 'Hand-poured Jar Candle' })
 })
+
+// Emails (login codes, enquiry notifications) are printed here instead of being sent.
+// Switched on after seeding so the seed can publish without an owner email.
+const { setEmailTransportForTests } = await import('../../services/emailService.js')
+setEmailTransportForTests(async (msg) => console.log(`
+[email to ${msg.to}] ${msg.subject}`))
 
 console.log(`Local preview: ${base}  ·  storefront ${base}/s/${created.slug}`)
 console.log(`Admin (local only): open ${base}/owner/admin with token ${process.env.OWNER_ADMIN_TOKEN}`)

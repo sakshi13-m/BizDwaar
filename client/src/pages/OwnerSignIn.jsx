@@ -6,7 +6,18 @@ import { requestLoginCode, verifyLoginCode } from '../api/owner'
  * Step 1: email → we send a 6-digit code. Step 2: code → logged in on this device.
  * Pages created in this browser before logging in are attached to the account.
  */
-export default function OwnerSignIn({ onSignedIn, onCancel }) {
+export default function OwnerSignIn({
+  onSignedIn,
+  onCancel,
+  // Optional overrides so the same flow can be embedded (e.g. "verify email to publish")
+  eyebrow = 'Owner login',
+  title = 'Log in with your email',
+  intro = "We'll email you a 6-digit code — no password to remember. Logging in keeps your business page and enquiries safe, and lets you manage them from any phone or computer.",
+  codeTitle = 'Enter your code',
+  submitLabel = 'Log in',
+  cancelLabel = '← Back',
+  className = ''
+}) {
   const [step, setStep] = useState('email') // 'email' | 'code'
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
@@ -51,16 +62,13 @@ export default function OwnerSignIn({ onSignedIn, onCancel }) {
   }
 
   return (
-    <div className="state-panel signin">
-      <p className="eyebrow eyebrow--coral">Owner login</p>
-      <h1 className="h-page">{step === 'email' ? 'Log in with your email' : 'Enter your code'}</h1>
+    <div className={`state-panel signin ${className}`}>
+      <p className="eyebrow eyebrow--coral">{eyebrow}</p>
+      <h1 className="h-page">{step === 'email' ? title : codeTitle}</h1>
 
       {step === 'email' ? (
         <>
-          <p>
-            We'll email you a 6-digit code — no password to remember. Logging in keeps your business page
-            and enquiries safe, and lets you manage them from any phone or computer.
-          </p>
+          <p>{intro}</p>
           <form onSubmit={sendCode} className="admin-form">
             <div className="field">
               <label htmlFor="signin-email">Email address</label>
@@ -106,7 +114,7 @@ export default function OwnerSignIn({ onSignedIn, onCancel }) {
             </div>
             {error && <p className="alert alert--error" role="alert">{error}</p>}
             <button type="submit" disabled={busy || code.length !== 6} className="btn btn--primary btn--block">
-              {busy ? 'Checking…' : 'Log in'}
+              {busy ? 'Checking…' : submitLabel}
             </button>
           </form>
           <div className="signin__links">
@@ -117,7 +125,7 @@ export default function OwnerSignIn({ onSignedIn, onCancel }) {
       )}
 
       {onCancel && (
-        <button type="button" className="btn btn--text signin__cancel" onClick={onCancel}>← Back</button>
+        <button type="button" className="btn btn--text signin__cancel" onClick={onCancel}>{cancelLabel}</button>
       )}
     </div>
   )

@@ -326,6 +326,7 @@ function OwnerFlow() {
             )}
             <MyStorefronts businesses={myBusinesses} onOpen={openExisting} loggedIn={me.loggedIn} onSignIn={me.emailLogin ? goSignIn : null} />
             <Onboarding
+              emailAtPublish={me.emailLogin && !me.loggedIn}
               onCreated={(id) => {
                 setBusinessId(id)
                 setStep('review')
@@ -345,6 +346,8 @@ function OwnerFlow() {
         )}
         <OwnerReview
           businessId={businessId}
+          requireEmailToPublish={me.emailLogin && !me.loggedIn && !adminMode}
+          onAccountChanged={() => refreshOwner().catch(() => {})}
           onPublished={(slug, name) => {
             setPublishedSlug(slug)
             setPublishedBusinessId(businessId)

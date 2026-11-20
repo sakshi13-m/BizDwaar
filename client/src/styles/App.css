@@ -808,7 +808,19 @@ select { appearance: none; cursor: pointer; padding-right: 2.4rem; background-im
 .plan__contact a { color: var(--teal); font-weight: 600; }
 .plan__list li::before { content: '✓'; position: absolute; left: 0; top: 0; font-weight: 800; color: var(--teal); }
 
+/* Enquiry form: "email or phone — at least one" group */
+.contact-group { border: none; padding: 0; margin: 0 0 1.1rem; min-width: 0; }
+.contact-group legend { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; font-weight: 700; font-size: .9rem; margin-bottom: .6rem; }
+.contact-group .field { margin-bottom: .4rem; }
+.contact-group .field label { font-weight: 600; font-size: .85rem; color: var(--ink-2); }
+
 /* ---------- Owner login, account bar, admin ---------- */
+/* "One last step" email check shown over the publish preview */
+.publish-verify {
+  position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 1rem;
+  background: rgba(37, 51, 47, .55); backdrop-filter: blur(3px); overflow-y: auto;
+}
+.publish-verify__panel { margin: 0; width: 100%; box-shadow: var(--shadow-lg); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .btn--inline { display: inline; padding: 0; font-size: inherit; vertical-align: baseline; }
 .site-nav__cta { display: flex; align-items: center; gap: 1rem; }

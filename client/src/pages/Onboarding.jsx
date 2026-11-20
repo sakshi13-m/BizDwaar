@@ -16,7 +16,7 @@ const ORGANISING_MESSAGES = [
   'Preparing your draft for review…'
 ]
 
-export default function Onboarding({ onCreated }) {
+export default function Onboarding({ onCreated, emailAtPublish = false }) {
   const [form, setForm] = useState({
     businessName: '',
     businessType: '',
@@ -220,7 +220,10 @@ export default function Onboarding({ onCreated }) {
             <button type="submit" disabled={loading} className="btn btn--primary btn--lg">
               {loading ? 'Organising your information…' : 'Organise with Bizdwaar →'}
             </button>
-            <p>Next: review the draft. Nothing is public until you publish.</p>
+            <p>
+              Next: review the draft. Nothing is public until you publish.
+              {emailAtPublish && ' You\'ll confirm your email when you publish, so enquiries reach you.'}
+            </p>
           </div>
         </form>
 

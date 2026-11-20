@@ -10,6 +10,7 @@ import {
 import Business, { toOwnerView } from '../models/Business.js'
 import Enquiry from '../models/Enquiry.js'
 import { analyseBusinessInput } from '../services/claudeService.js'
+import { emailConfigured } from '../services/emailService.js'
 import { parsePriceInput, MAX_PRICE } from '../../shared/price.js'
 
 const router = Router()
@@ -260,6 +261,16 @@ router.post('/businesses/:id/publish', requireOwner, requireBusinessOwnership, w
     return res.status(422).json({
       error: 'publish_blocked',
       message: 'Business description is required before publishing.'
+    })
+  }
+
+  // Every live page needs a verified owner email (for enquiries and access from any device).
+  // Drafts stay registration-free; the owner verifies their email at publish time, which claims
+  // the page. Skipped when email can't be delivered (local dev, provider outage) and for the admin.
+  if (!business.ownerId && !req.isAdmin && emailConfigured()) {
+    return res.status(403).json({
+      error: 'login_required',
+      message: 'Confirm your email to publish, so enquiries reach you and you can manage your page from any device.'
     })
   }
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { getBusiness, updateBusiness, publishBusiness } from '../api/owner'
 import StorefrontView from '../components/StorefrontView'
 import SmartImage from '../components/SmartImage'
+import OwnerSignIn from './OwnerSignIn'
 import { itemImageFor, tileToneFor } from '../lib/imagery'
 import { parsePriceInput, formatPrice, PRICE_ON_REQUEST } from '../../../shared/price.js'
 
@@ -148,7 +149,7 @@ const AVAILABILITY_OPTIONS = [
   { value: 'out_of_stock', label: 'Out of stock' }
 ]
 
-export default function OwnerReview({ businessId, onPublished }) {
+export default function OwnerReview({ businessId, onPublished, requireEmailToPublish = false, onAccountChanged }) {
   const [business, setBusiness] = useState(null)
   const [approved, setApproved] = useState({ approvedProfile: {}, approvedCatalogue: [] })
   const [loading, setLoading] = useState(true)
@@ -159,6 +160,7 @@ export default function OwnerReview({ businessId, onPublished }) {
   const [saved, setSaved] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [checkedClaims, setCheckedClaims] = useState({})
+  const [verifyToPublish, setVerifyToPublish] = useState(false) // "one last step" email check before going live
   const [dirty, setDirty] = useState(false)
   const [pendingLive, setPendingLive] = useState(false) // saved edits not yet on the live business page
 
@@ -376,6 +378,22 @@ export default function OwnerReview({ businessId, onPublished }) {
   }
 
   async function handleConfirmPublish() {
+    // Live pages need a verified owner email: ask for it here instead of failing on the server
+    if (requireEmailToPublish) {
+      setVerifyToPublish(true)
+      return
+    }
+    await doPublish()
+  }
+
+  // After the email is verified this browser's draft belongs to the account, so publishing succeeds
+  async function handleVerifiedThenPublish() {
+    if (onAccountChanged) await onAccountChanged()
+    setVerifyToPublish(false)
+    await doPublish()
+  }
+
+  async function doPublish() {
     setPublishing(true)
     setError('')
     try {
@@ -385,6 +403,8 @@ export default function OwnerReview({ businessId, onPublished }) {
         setShowPreview(false)
         setPendingLive(false)
         onPublished(pubRes.slug || business.slug, approved.approvedProfile.businessName || business.name)
+      } else if (pubRes.error === 'login_required') {
+        setVerifyToPublish(true)
       } else {
         setError(pubRes.message || 'Publish failed. Please fill in required fields.')
         setShowPreview(false)
@@ -458,6 +478,21 @@ export default function OwnerReview({ businessId, onPublished }) {
               <StorefrontView business={previewBusiness} mode="preview" />
             </div>
           </div>
+          {verifyToPublish && (
+            <div className="publish-verify" role="dialog" aria-modal="true" aria-label="Confirm your email to publish">
+              <OwnerSignIn
+                className="publish-verify__panel"
+                eyebrow="One last step"
+                title="Where should we send your enquiries?"
+                intro="Confirm your email to go live. We'll send enquiries for this page there, and you'll use it to manage your page from any phone or computer. We'll email you a 6-digit code — no password needed."
+                codeTitle="Enter the code we sent"
+                submitLabel={isLive ? 'Verify & update live page' : 'Verify & publish'}
+                cancelLabel="← Back to preview"
+                onSignedIn={handleVerifiedThenPublish}
+                onCancel={() => setVerifyToPublish(false)}
+              />
+            </div>
+          )}
           <div className="preview-bar">
             <div className="preview-bar__text">
               <strong>This is exactly what customers will see.</strong>
