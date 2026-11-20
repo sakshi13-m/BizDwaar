@@ -1,6 +1,9 @@
 import { randomUUID } from 'crypto'
 import { getPool } from '../db.js'
 
+// mysql2 returns JSON columns as objects; tolerate strings too
+const json = v => (typeof v === 'string' ? JSON.parse(v) : v ?? null)
+
 // Row → JS object
 function deserialise(row) {
   if (!row) return null
@@ -11,10 +14,15 @@ function deserialise(row) {
     slug:             row.slug,
     category:         row.category,
     location:         row.location,
-    ownerInput:       typeof row.owner_input      === 'string' ? JSON.parse(row.owner_input)      : row.owner_input,
-    aiDraft:          typeof row.ai_draft          === 'string' ? JSON.parse(row.ai_draft)          : row.ai_draft,
-    approvedProfile:  typeof row.approved_profile  === 'string' ? JSON.parse(row.approved_profile)  : row.approved_profile,
-    approvedCatalogue:typeof row.approved_catalogue=== 'string' ? JSON.parse(row.approved_catalogue): row.approved_catalogue,
+    ownerInput:       json(row.owner_input),
+    aiDraft:          json(row.ai_draft),
+    // Owner's working copy (edited in the review screen, private)
+    approvedProfile:  json(row.approved_profile),
+    approvedCatalogue:json(row.approved_catalogue),
+    // Snapshot taken at publish time — what customers see. NULL on rows published
+    // before snapshots existed; publicSnapshot() falls back to approved_* for those.
+    publishedProfile:   json(row.published_profile),
+    publishedCatalogue: json(row.published_catalogue),
     status:           row.status,
     // Internal only — strip with toOwnerView() / public allowlist before responding
     ownerSessionHash: row.owner_session_hash || null,
@@ -102,6 +110,14 @@ const Business = {
       fields.push('approved_catalogue = ?')
       params.push(JSON.stringify($set.approvedCatalogue))
     }
+    if ($set.publishedProfile !== undefined) {
+      fields.push('published_profile = ?')
+      params.push(JSON.stringify($set.publishedProfile))
+    }
+    if ($set.publishedCatalogue !== undefined) {
+      fields.push('published_catalogue = ?')
+      params.push(JSON.stringify($set.publishedCatalogue))
+    }
     if ($set.status !== undefined) {
       fields.push('status = ?')
       params.push($set.status)
@@ -118,15 +134,15 @@ const Business = {
     return returnNew ? Business.findById(id) : null
   },
 
-  // Used in publish route — save() pattern
-  async _save(obj) {
+  // Publish: copy the owner's approved working copy into the public snapshot
+  async publish(business) {
     return Business.findByIdAndUpdate(
-      obj.id || obj._id,
+      business.id,
       { $set: {
-          status:      obj.status,
-          publishedAt: obj.publishedAt,
-          approvedProfile:   obj.approvedProfile,
-          approvedCatalogue: obj.approvedCatalogue,
+          status:             'published',
+          publishedAt:        new Date(),
+          publishedProfile:   business.approvedProfile || {},
+          publishedCatalogue: business.approvedCatalogue || []
       }},
       { new: true }
     )
@@ -153,11 +169,31 @@ const Business = {
   }
 }
 
+/**
+ * What customers see for a published business: the publish-time snapshot, or — for rows
+ * published before snapshots existed — the approved fields, exactly as served before.
+ */
+export function publicSnapshot(business) {
+  const hasSnapshot = business.publishedProfile !== null && business.publishedProfile !== undefined
+  return {
+    profile:   (hasSnapshot ? business.publishedProfile : business.approvedProfile) || {},
+    catalogue: (hasSnapshot ? business.publishedCatalogue : business.approvedCatalogue) || []
+  }
+}
+
+// True when the owner has saved edits that are not live yet
+export function hasUnpublishedChanges(business) {
+  if (business.status !== 'published') return false
+  const live = publicSnapshot(business)
+  return JSON.stringify(business.approvedProfile || {}) !== JSON.stringify(live.profile) ||
+    JSON.stringify(business.approvedCatalogue || []) !== JSON.stringify(live.catalogue)
+}
+
 // Owner-facing representation — never includes the session hash
 export function toOwnerView(business) {
   if (!business) return null
   const { ownerSessionHash, ...rest } = business
-  return rest
+  return { ...rest, hasUnpublishedChanges: hasUnpublishedChanges(business) }
 }
 
 export default Business

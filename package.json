@@ -9,7 +9,8 @@
     "dev:server": "nodemon server/index.js",
     "dev:client": "vite --config vite.config.js",
     "build": "vite build --config vite.config.js",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "test": "node --test \"server/test/*.test.js\""
   },
   "engines": {
     "node": ">=18.0.0"

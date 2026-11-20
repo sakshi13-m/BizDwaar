@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
-import Business from '../models/Business.js'
+import Business, { publicSnapshot } from '../models/Business.js'
 import Enquiry from '../models/Enquiry.js'
 import { sendEnquiryEmail } from '../services/emailService.js'
 
@@ -69,14 +69,14 @@ async function handleEnquiry(req, res) {
   // Only accept a product name that matches one of this business's publicly visible items
   let matchedProduct = null
   if (productName) {
-    const visibleNames = (business.approvedCatalogue || [])
+    const visibleNames = publicSnapshot(business).catalogue
       .filter(item => item.publicVisible === true && item.name)
       .map(item => item.name)
     matchedProduct = visibleNames.find(n => n === productName) || null
     if (!matchedProduct) {
       return res.status(400).json({
         error: 'validation_error',
-        message: 'That product is not available on this storefront.'
+        message: 'That product is not available on this business page.'
       })
     }
   }

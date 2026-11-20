@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
+import { parsePriceInput } from '../../shared/price.js'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 const MODEL = process.env.CLAUDE_MODEL || 'claude-opus-4-5'
@@ -9,7 +10,10 @@ const MODEL = process.env.CLAUDE_MODEL || 'claude-opus-4-5'
 const CatalogueItemSchema = z.object({
   name:          z.string().nullable(),
   description:   z.string().nullable(),
-  price:         z.string().nullable(),
+  // INR amount as a number. Text such as "₹1,299" is converted; anything that is not a single
+  // plain amount ("300-500", "depends") becomes null so the owner is asked, never guessed for.
+  price:         z.union([z.number(), z.string(), z.null()]).optional()
+                  .transform(v => parsePriceInput(v ?? null) ?? null),
   unitOrSize:    z.string().nullable(),
   attributes:    z.array(z.string()).default([]),
   missingFields: z.array(z.string()).default([])
@@ -39,9 +43,10 @@ STRICT RULES — read carefully before responding:
 3. For every null/missing field that a customer would need to know, add an entry to missingQuestions with a clear, direct question for the owner.
 4. Do not fabricate product names or service names if none were supplied.
 5. businessSummary should be a neutral one-to-two sentence description based only on what the owner said. Do not add marketing language or claims the owner did not make.
-6. suggestedCategory: suggest one short category label (e.g. "Home Food", "Clothing", "Jewellery") only if it is obvious from the input — otherwise null.
-7. unsupportedClaims: list any factual claims in the owner input that cannot be verified (e.g. "best in city", "100% organic") — do not include them in the summary.
-8. Return ONLY valid JSON matching the schema. No prose, no markdown, no code fences.
+6. price: a plain number in Indian Rupees exactly as the owner stated it (e.g. 1299 for "₹1,299" or "Rs 1299"), with no currency symbol, commas or units. Put units such as "per kg" or "200g" in unitOrSize. If the owner gave a range, an approximate price or no price, use null.
+7. suggestedCategory: suggest one short category label (e.g. "Home Food", "Clothing", "Jewellery") only if it is obvious from the input — otherwise null.
+8. unsupportedClaims: list any factual claims in the owner input that cannot be verified (e.g. "best in city", "100% organic") — do not include them in the summary.
+9. Return ONLY valid JSON matching the schema. No prose, no markdown, no code fences.
 
 OWNER-PROVIDED INPUT:
 Business name: ${input.businessName || 'Not provided'}
@@ -58,7 +63,7 @@ REQUIRED JSON SCHEMA:
     {
       "name": string | null,
       "description": string | null,
-      "price": string | null,
+      "price": number | null,
       "unitOrSize": string | null,
       "attributes": string[],
       "missingFields": string[]
@@ -78,11 +83,16 @@ export async function analyseBusinessInput(input) {
 
   const message = await client.messages.create({
     model: MODEL,
-    max_tokens: 1024,
+    max_tokens: 2048,
     messages: [{ role: 'user', content: prompt }]
   })
 
-  const raw = message.content[0]?.text
+  if (message.stop_reason === 'max_tokens') throw new Error('Claude response was cut off (max_tokens)')
+  return parseClaudeResponse(message.content.find(b => b.type === 'text')?.text)
+}
+
+// Parse and validate Claude's raw text. Exported for tests.
+export function parseClaudeResponse(raw) {
   if (!raw) throw new Error('Claude returned an empty response')
 
   let parsed
@@ -95,6 +105,5 @@ export async function analyseBusinessInput(input) {
   }
 
   // Validate with Zod — throws if schema is violated
-  const validated = ClaudeOutputSchema.parse(parsed)
-  return validated
+  return ClaudeOutputSchema.parse(parsed)
 }

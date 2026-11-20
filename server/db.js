@@ -11,16 +11,27 @@ export async function connectDB() {
     database: process.env.DB_NAME,
     waitForConnections: true,
     connectionLimit: 10,
-    // Fall back to MONGODB_URI check for local dev clarity
   })
 
-  // Verify connection
-  const conn = await pool.getConnection()
-  console.log('MySQL connected:', process.env.DB_HOST || 'localhost')
-  conn.release()
+  // Verify connection; close the pool on failure so retries don't leak connections
+  try {
+    const conn = await pool.getConnection()
+    conn.release()
+  } catch (err) {
+    const failed = pool
+    pool = null
+    failed.end().catch(() => {})
+    throw err
+  }
+  console.log('MySQL connected')
 
   // Create tables if they don't exist
   await initSchema()
+}
+
+// Tests only: run the models against an in-memory stand-in instead of MySQL
+export function setPoolForTests(fakePool) {
+  pool = fakePool
 }
 
 export function getPool() {
@@ -114,4 +125,10 @@ async function runAdditiveMigrations() {
   // Enquiry management — existing enquiries become 'new'; product interest stays NULL
   await addColumnIfMissing('enquiries', 'status', "ENUM('new','replied','closed') NOT NULL DEFAULT 'new'")
   await addColumnIfMissing('enquiries', 'product_name', 'VARCHAR(200) NULL DEFAULT NULL')
+
+  // Published snapshot: what customers see. Edits to approved_* stay private until the owner
+  // publishes again. Existing published rows keep NULL here and keep serving approved_*
+  // exactly as before, so this migration copies or rewrites no data.
+  await addColumnIfMissing('businesses', 'published_profile', 'JSON NULL DEFAULT NULL')
+  await addColumnIfMissing('businesses', 'published_catalogue', 'JSON NULL DEFAULT NULL')
 }

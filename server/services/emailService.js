@@ -24,7 +24,7 @@ export async function sendEnquiryEmail(enquiry, business) {
 
   const subject = `New enquiry from ${enquiry.customerName} | ${business.name}`
   const text = `
-You have received a new enquiry from your Bizdwaar storefront.
+You have received a new enquiry from your Bizdwaar business page.
 
 Business: ${business.name}
 Customer: ${enquiry.customerName}

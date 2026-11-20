@@ -33,10 +33,21 @@ function readSessionSecret(req) {
   return typeof secret === 'string' && SECRET_PATTERN.test(secret) ? secret : null
 }
 
+// The admin fallback can manage every storefront, so a short or guessable token is refused
+// outright: the fallback stays disabled until OWNER_ADMIN_TOKEN is at least this long.
+export const MIN_ADMIN_TOKEN_LENGTH = 32
+
+// 'unset' | 'weak' | 'ok' — logged at startup, never the value itself
+export function adminTokenStatus() {
+  const token = process.env.OWNER_ADMIN_TOKEN
+  if (!token) return 'unset'
+  return token.length >= MIN_ADMIN_TOKEN_LENGTH ? 'ok' : 'weak'
+}
+
 export function isAdminRequest(req) {
-  const adminToken = process.env.OWNER_ADMIN_TOKEN
+  if (adminTokenStatus() !== 'ok') return false
   const cookieToken = req.cookies?.ownerToken
-  return Boolean(adminToken) && safeEqual(cookieToken, adminToken)
+  return safeEqual(cookieToken, process.env.OWNER_ADMIN_TOKEN)
 }
 
 export function sessionCookieOptions() {
@@ -99,8 +110,8 @@ export async function requireBusinessOwnership(req, res, next) {
     if (!owns && !req.isAdmin) {
       return res.status(403).json({
         error: 'forbidden',
-        message: 'This storefront can only be managed from the browser it was created in. ' +
-          'In this hackathon version, storefronts are managed from the original browser session.'
+        message: 'This business page can only be managed from the browser it was created in. ' +
+          'In this hackathon version, business pages are managed from the original browser session.'
       })
     }
 

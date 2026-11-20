@@ -11,6 +11,7 @@ import {
 import Business, { toOwnerView } from '../models/Business.js'
 import Enquiry from '../models/Enquiry.js'
 import { analyseBusinessInput } from '../services/claudeService.js'
+import { parsePriceInput, MAX_PRICE } from '../../shared/price.js'
 
 const router = Router()
 
@@ -23,12 +24,41 @@ const createLimiter = rateLimit({
   max: 10,
   message: {
     error: 'rate_limit_exceeded',
-    message: 'Too many storefronts created from this network. Please try again later.'
+    message: 'Too many business pages created from this network. Please try again later.'
   },
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => req.ip
 })
+
+// Admin token login — throttle guessing
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'rate_limit_exceeded', message: 'Too many attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip
+})
+
+const PriceInputSchema = z
+  .union([z.number(), z.string().max(100), z.null()])
+  .transform((value, ctx) => {
+    const amount = parsePriceInput(value)
+    if (amount === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Enter the price as a number in rupees, e.g. 1299 (up to ${MAX_PRICE}).`
+      })
+      return z.NEVER
+    }
+    return amount
+  })
+
+// Show the owner the specific reason (e.g. a price that isn't a number) when we have one
+function firstCustomMessage(error) {
+  return error.issues.find(i => i.code === z.ZodIssueCode.custom)?.message || null
+}
 
 // --- Slug helper ---
 function toSlug(name) {
@@ -37,7 +67,7 @@ function toSlug(name) {
     .trim()
     .replace(/['’]/g, '')          // "Sara's Studio" → "saras-studio"
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'storefront'
+    .replace(/^-+|-+$/g, '') || 'business'
 }
 
 // -------------------------------------------------------
@@ -52,7 +82,7 @@ router.post('/session', startOwnerSession)
 // -------------------------------------------------------
 const LoginSchema = z.object({ token: z.string().min(1) })
 
-router.post('/login', (req, res) => {
+router.post('/login', loginLimiter, (req, res) => {
   const result = LoginSchema.safeParse(req.body)
   if (!result.success) {
     return res.status(400).json({ error: 'validation_error', message: 'Token required.' })
@@ -177,13 +207,15 @@ const UpdateBusinessSchema = z.object({
   approvedCatalogue: z.array(z.object({
     name:          z.string().max(200).nullable(),
     description:   z.string().max(1000).nullable(),
-    price:         z.string().max(100).nullable(),
+    // INR amount stored as a number. Numeric text ("1299", "₹1,299") is accepted and converted;
+    // anything else is rejected rather than guessed. null = price on request.
+    price:         PriceInputSchema,
     unitOrSize:    z.string().max(100).nullable(),
-    attributes:    z.array(z.string()).default([]),
+    attributes:    z.array(z.string().max(80)).max(20).default([]),
     publicVisible: z.boolean().default(false),
     // Owner-stated only; null = not stated (nothing shown publicly)
     availability:  z.enum(['available', 'made_to_order', 'out_of_stock']).nullable().default(null)
-  })).optional()
+  })).max(100).optional()
 })
 
 router.put('/businesses/:id', requireOwner, requireBusinessOwnership, wrap(async (req, res) => {
@@ -191,7 +223,7 @@ router.put('/businesses/:id', requireOwner, requireBusinessOwnership, wrap(async
   if (!result.success) {
     return res.status(400).json({
       error: 'validation_error',
-      message: 'Invalid update data.',
+      message: firstCustomMessage(result.error) || 'Some details could not be saved. Please check the highlighted fields.',
       details: result.error.flatten().fieldErrors
     })
   }
@@ -214,7 +246,8 @@ router.put('/businesses/:id', requireOwner, requireBusinessOwnership, wrap(async
 
 // -------------------------------------------------------
 // POST /api/owner/businesses/:id/publish  (owner of this business)
-// Validate required fields then publish
+// Validate required fields, then copy the saved (approved) copy into the public snapshot.
+// This is the only route that changes what customers see.
 // -------------------------------------------------------
 router.post('/businesses/:id/publish', requireOwner, requireBusinessOwnership, wrap(async (req, res) => {
   const business = req.business
@@ -234,9 +267,7 @@ router.post('/businesses/:id/publish', requireOwner, requireBusinessOwnership, w
     })
   }
 
-  business.status      = 'published'
-  business.publishedAt = new Date()
-  const saved = await Business._save(business)
+  const saved = await Business.publish(business)
 
   return res.json({ ok: true, slug: saved.slug, publishedAt: saved.publishedAt })
 }))
