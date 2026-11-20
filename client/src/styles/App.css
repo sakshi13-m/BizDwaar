@@ -189,6 +189,11 @@ button { font: inherit; color: inherit; }
 .field { display: flex; flex-direction: column; gap: .4rem; margin-bottom: 1.1rem; }
 .field label { font-weight: 700; font-size: .9rem; color: var(--ink); display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; }
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+/* Paired fields share label / control / help rows (subgrid), so inputs line up even when one
+   label wraps or carries a "Needs your input" badge and the other does not. */
+.field-pair { grid-template-rows: auto auto auto; row-gap: 0; }
+.field-pair > .field { grid-row: span 3; display: grid; grid-template-rows: subgrid; row-gap: .4rem; align-content: start; }
+.field-pair > .field > label { align-self: end; }
 .req { color: var(--coral-600); }
 .optional { font-weight: 500; font-size: .78rem; color: var(--ink-3); }
 
@@ -210,6 +215,7 @@ input.is-missing, textarea.is-missing { border-style: dashed; border-color: var(
   pointer-events: none;
 }
 .money-input input { padding-left: 2.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.money-input input::placeholder { font-weight: 400; }
 .money-input.is-missing input { border-style: dashed; border-color: var(--mango-600); background: #fffaf0; }
 .money-input.is-invalid input { border-color: var(--coral-600); background: var(--coral-50); }
 .money-input.is-invalid input:focus { box-shadow: 0 0 0 4px rgba(231, 125, 101, .18); }
