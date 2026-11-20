@@ -12,6 +12,40 @@ function scrollToId(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+// Sections reachable from the header (in page order)
+const NAV_SECTIONS = [
+  { id: 'how', label: 'How it works' },
+  { id: 'journey', label: 'Journey' },
+  { id: 'trust', label: 'Trustworthy AI' },
+  { id: 'example', label: 'Example' },
+  { id: 'plans', label: "What's free" }
+]
+
+// Which section is on screen (for highlighting the header link) and whether to show "Back to top"
+function useScrollState() {
+  const [active, setActive] = useState(null)
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    function onScroll() {
+      setScrolled(window.scrollY > 700)
+      const probe = window.innerHeight * 0.35
+      let current = null
+      for (const s of NAV_SECTIONS) {
+        const el = document.getElementById(s.id)
+        if (el && el.getBoundingClientRect().top <= probe) current = s.id
+      }
+      // Past the end of the last section (final call to action) → nothing highlighted
+      const last = document.getElementById(NAV_SECTIONS[NAV_SECTIONS.length - 1].id)
+      if (last && last.getBoundingClientRect().bottom < probe) current = null
+      setActive(current)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+  return { active, scrolled }
+}
+
 // The full owner journey, Describe → Update
 const JOURNEY = [
   { title: 'Describe', line: 'Tell us about your business in everyday words.', tone: 'coral', phase: 'Launch · once' },
@@ -58,6 +92,8 @@ const CUSTOM_SITE_MAILTO = `mailto:${CUSTOM_SITE_EMAIL}?subject=${encodeURICompo
 )}`
 
 export default function LandingPage() {
+  const { active, scrolled } = useScrollState()
+
   // Show "Log in" only when email login is available on this server
   const [emailLogin, setEmailLogin] = useState(false)
   useEffect(() => {
@@ -72,11 +108,18 @@ export default function LandingPage() {
       {/* ---------- Nav ---------- */}
       <nav className="site-nav">
         <Logo />
-        <div className="site-nav__links">
-          <button type="button" onClick={() => scrollToId('how')}>How it works</button>
-          <button type="button" onClick={() => scrollToId('trust')}>Trustworthy AI</button>
-          <button type="button" onClick={() => scrollToId('example')}>Example</button>
-          <button type="button" onClick={() => scrollToId('plans')}>What's free</button>
+        <div className="site-nav__links" aria-label="Page sections">
+          {NAV_SECTIONS.map(s => (
+            <button
+              key={s.id}
+              type="button"
+              className={active === s.id ? 'is-active' : ''}
+              aria-current={active === s.id ? 'true' : undefined}
+              onClick={() => scrollToId(s.id)}
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
         <div className="site-nav__cta">
           {emailLogin && (
@@ -454,6 +497,18 @@ export default function LandingPage() {
           </p>
         </div>
       </footer>
+
+      <button
+        type="button"
+        className={`to-top ${scrolled ? 'is-visible' : ''}`}
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        aria-label="Back to top"
+        tabIndex={scrolled ? 0 : -1}
+      >
+        <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 19V5M6 11l6-6 6 6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
     </div>
   )
 }

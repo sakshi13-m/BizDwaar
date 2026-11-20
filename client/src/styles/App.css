@@ -291,7 +291,9 @@ input.is-missing, textarea.is-missing { border-style: dashed; border-color: var(
 /* =========================================================
    HOMEPAGE
    ========================================================= */
-.landing { background: var(--ivory-2); overflow-x: hidden; }
+/* overflow-x: clip (not hidden) so the sticky header keeps working; hidden is the fallback for old browsers */
+.landing { background: var(--ivory-2); overflow-x: hidden; overflow-x: clip; }
+.landing section[id] { scroll-margin-top: 5.5rem; }
 
 .site-nav {
   position: sticky; top: 0; z-index: 30;
@@ -303,6 +305,24 @@ input.is-missing, textarea.is-missing { border-style: dashed; border-color: var(
 .site-nav__links { display: flex; gap: 1.75rem; }
 .site-nav__links button { background: none; border: none; cursor: pointer; font-weight: 600; font-size: .95rem; color: var(--ink-2); }
 .site-nav__links button:hover { color: var(--teal); }
+.site-nav__links button { position: relative; padding: .35rem 0; }
+.site-nav__links button.is-active { color: var(--teal); }
+.site-nav__links button.is-active::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -2px; height: 2px; border-radius: 2px; background: var(--mango);
+}
+
+/* Floating "back to top" */
+.to-top {
+  position: fixed; right: clamp(1rem, 3vw, 2rem); bottom: clamp(1rem, 3vw, 2rem); z-index: 40;
+  width: 3rem; height: 3rem; border-radius: 50%; border: none; cursor: pointer;
+  display: grid; place-items: center; background: var(--teal); color: var(--white);
+  border: 2px solid rgba(255, 255, 255, .9);
+  box-shadow: var(--shadow-md); opacity: 0; transform: translateY(12px); pointer-events: none;
+  transition: opacity .2s, transform .2s;
+}
+.to-top.is-visible { opacity: 1; transform: none; pointer-events: auto; }
+.to-top:hover { background: var(--teal-700); }
+.to-top .icon { width: 1.3rem; height: 1.3rem; }
 
 /* Hero */
 .hero {
@@ -879,7 +899,21 @@ select { appearance: none; cursor: pointer; padding-right: 2.4rem; background-im
     background: var(--teal-50); color: var(--teal); font-size: .84rem; font-weight: 700; border-radius: var(--r-sm);
   }
   .plans__grid { grid-template-columns: 1fr; }
-  .site-nav__links, .workspace-nav__tag { display: none; }
+  .workspace-nav__tag { display: none; }
+  /* Section links become a swipeable chip row under the header */
+  .site-nav { flex-wrap: wrap; row-gap: .55rem; padding-bottom: .6rem; }
+  .site-nav__links {
+    order: 3; width: 100%; gap: .45rem; overflow-x: auto; scrollbar-width: none;
+    margin: 0 calc(-1 * clamp(1rem, 4vw, 3rem)); padding: 0 clamp(1rem, 4vw, 3rem);
+  }
+  .site-nav__links::-webkit-scrollbar { display: none; }
+  .site-nav__links button {
+    flex-shrink: 0; font-size: .82rem; padding: .3rem .75rem; border-radius: 999px;
+    background: var(--white); border: 1px solid var(--line);
+  }
+  .site-nav__links button.is-active { background: var(--teal); border-color: var(--teal); color: var(--white); }
+  .site-nav__links button.is-active::after { display: none; }
+  .landing section[id] { scroll-margin-top: 7.5rem; }
   .stepper__label { display: none; }
   .hero__float { display: none; }
   .hero__img { height: 360px; }
