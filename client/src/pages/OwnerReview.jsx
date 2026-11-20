@@ -2,11 +2,33 @@ import { useState, useEffect } from 'react'
 import { getBusiness, updateBusiness, publishBusiness } from '../api/owner'
 import StorefrontView from '../components/StorefrontView'
 import SmartImage from '../components/SmartImage'
-import { itemImageFor } from '../lib/imagery'
+import { itemImageFor, tileToneFor } from '../lib/imagery'
+import { parsePriceInput, formatPrice, PRICE_ON_REQUEST } from '../../../shared/price.js'
 
 // A catalogue row the owner added but never filled in is ignored
 function hasContent(item) {
   return ['name', 'description', 'price', 'unitOrSize'].some(k => typeof item[k] === 'string' && item[k].trim() !== '')
+}
+
+// Prices are edited as text but saved as a number of rupees. Returns an error message or null.
+function priceError(item) {
+  return parsePriceInput(item.price) === undefined
+    ? 'Enter the price as a number in rupees, e.g. 1299. Put units like "per kg" in Size / unit.'
+    : null
+}
+
+// Number from the server → editable text ("1299"); legacy text prices are shown as written
+function priceToInput(price) {
+  if (typeof price === 'number') return String(price)
+  return typeof price === 'string' ? price : ''
+}
+
+// What customers will see under the price field
+function priceHint(item) {
+  const amount = parsePriceInput(item.price)
+  if (amount === null) return `Customers will see "${PRICE_ON_REQUEST}".`
+  if (amount === 0) return 'Customers will see ₹0. Leave it blank instead if the price is on request.'
+  return `Customers will see ${formatPrice(amount)}`
 }
 
 // Turn empty strings into nulls so optional fields (e.g. contact email) pass server validation
@@ -25,7 +47,7 @@ function toPayload(approved) {
     approvedCatalogue: approved.approvedCatalogue.filter(hasContent).map(item => ({
       name:          blank(item.name),
       description:   blank(item.description),
-      price:         blank(item.price),
+      price:         parsePriceInput(item.price) ?? null, // number of rupees, or null = price on request
       unitOrSize:    blank(item.unitOrSize),
       attributes:    item.attributes || [],
       publicVisible: item.publicVisible === true,
@@ -127,11 +149,22 @@ export default function OwnerReview({ businessId, onPublished }) {
   const [saved, setSaved] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [checkedClaims, setCheckedClaims] = useState({})
+  const [dirty, setDirty] = useState(false)
+  const [pendingLive, setPendingLive] = useState(false) // saved edits not yet on the live business page
+
+  // Warn before leaving with unsaved edits
+  useEffect(() => {
+    if (!dirty) return
+    const warn = e => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [dirty])
 
   useEffect(() => {
     getBusiness(businessId).then(res => {
       if (res.ok) {
         setBusiness(res.business)
+        setPendingLive(Boolean(res.business.hasUnpublishedChanges))
         const draft = res.business.aiDraft
         const savedProfile = res.business.approvedProfile
         // Returning owner: restore previously saved edits instead of the raw AI draft
@@ -150,7 +183,7 @@ export default function OwnerReview({ businessId, onPublished }) {
               _source:       'saved',
               name:          item.name || '',
               description:   item.description || '',
-              price:         item.price || '',
+              price:         priceToInput(item.price),
               unitOrSize:    item.unitOrSize || '',
               attributes:    item.attributes || [],
               publicVisible: item.publicVisible === true,
@@ -174,7 +207,7 @@ export default function OwnerReview({ businessId, onPublished }) {
             _source:       'ai',
             name:          item.name || '',
             description:   item.description || '',
-            price:         item.price || '',
+            price:         priceToInput(item.price),
             unitOrSize:    item.unitOrSize || '',
             attributes:    item.attributes || [],
             publicVisible: false,  // default OFF — owner must opt in
@@ -194,6 +227,7 @@ export default function OwnerReview({ businessId, onPublished }) {
   function updateProfile(field, value) {
     setApproved(a => ({ ...a, approvedProfile: { ...a.approvedProfile, [field]: value } }))
     setSaved(false)
+    setDirty(true)
   }
 
   function updateCatalogueItem(index, field, value) {
@@ -203,6 +237,7 @@ export default function OwnerReview({ businessId, onPublished }) {
       return { ...a, approvedCatalogue: cat }
     })
     setSaved(false)
+    setDirty(true)
   }
 
   function focusField(id) {
@@ -222,6 +257,7 @@ export default function OwnerReview({ businessId, onPublished }) {
     const newIndex = approved.approvedCatalogue.length
     setApproved(a => ({ ...a, approvedCatalogue: [...a.approvedCatalogue, emptyItem()] }))
     setSaved(false)
+    setDirty(true)
     focusField(`it-name-${newIndex}`)
   }
 
@@ -231,6 +267,7 @@ export default function OwnerReview({ businessId, onPublished }) {
     if (!window.confirm(`Remove ${label} from your catalogue?`)) return
     setApproved(a => ({ ...a, approvedCatalogue: a.approvedCatalogue.filter((_, i) => i !== index) }))
     setSaved(false)
+    setDirty(true)
   }
 
   // Jump to the field that answers a question; free-text answers get a labelled line to type after
@@ -274,12 +311,28 @@ export default function OwnerReview({ businessId, onPublished }) {
     return at >= 0 && (value || '').slice(at + prefix.length).split('\n')[0].trim().length > 0
   }
 
+  // Block saving while any price isn't a number; jump to the first one
+  function checkPrices() {
+    const bad = approved.approvedCatalogue.findIndex(item => hasContent(item) && priceError(item))
+    if (bad < 0) return true
+    setError(`Item ${bad + 1}: ${priceError(approved.approvedCatalogue[bad])}`)
+    focusField(`it-price-${bad}`)
+    return false
+  }
+
+  function afterSave(res) {
+    setSaved(true)
+    setDirty(false)
+    if (res.business) setPendingLive(Boolean(res.business.hasUnpublishedChanges))
+  }
+
   async function handleSave() {
-    setSaving(true)
     setError('')
+    if (!checkPrices()) return
+    setSaving(true)
     try {
       const res = await updateBusiness(businessId, toPayload(approved))
-      if (res.ok) setSaved(true)
+      if (res.ok) afterSave(res)
       else setError(res.message || 'Save failed. Please try again.')
     } catch {
       setError('Network error — your changes were not saved.')
@@ -290,6 +343,7 @@ export default function OwnerReview({ businessId, onPublished }) {
   async function handlePreviewPublish() {
     // Save first, then show preview
     setError('')
+    if (!checkPrices()) return
     setSaving(true)
     try {
       const saveRes = await updateBusiness(businessId, toPayload(approved))
@@ -298,7 +352,7 @@ export default function OwnerReview({ businessId, onPublished }) {
         setError(saveRes.message || 'Save failed before preview.')
         return
       }
-      setSaved(true)
+      afterSave(saveRes)
       setShowPreview(true)
     } catch {
       setSaving(false)
@@ -314,6 +368,7 @@ export default function OwnerReview({ businessId, onPublished }) {
       setPublishing(false)
       if (pubRes.ok) {
         setShowPreview(false)
+        setPendingLive(false)
         onPublished(pubRes.slug || business.slug, approved.approvedProfile.businessName || business.name)
       } else {
         setError(pubRes.message || 'Publish failed. Please fill in required fields.')
@@ -322,7 +377,7 @@ export default function OwnerReview({ businessId, onPublished }) {
     } catch {
       setPublishing(false)
       setShowPreview(false)
-      setError('Network error — your storefront was not published.')
+      setError('Network error — your business page was not published.')
     }
   }
 
@@ -337,7 +392,7 @@ export default function OwnerReview({ businessId, onPublished }) {
   if (!business) {
     return (
       <div className="state-panel state-panel--error">
-        <h2>We couldn't open this storefront</h2>
+        <h2>We couldn't open this business page</h2>
         <p>{loadError || 'Business not found.'}</p>
       </div>
     )
@@ -377,7 +432,7 @@ export default function OwnerReview({ businessId, onPublished }) {
     <div className="review">
       {/* ---------- Preview overlay ---------- */}
       {showPreview && (
-        <div className="preview-overlay" role="dialog" aria-modal="true" aria-label="Storefront preview">
+        <div className="preview-overlay" role="dialog" aria-modal="true" aria-label="Business page preview">
           <div className="preview-frame browser">
             <div className="browser__bar">
               <span className="browser__dots"><i /><i /><i /></span>
@@ -407,7 +462,7 @@ export default function OwnerReview({ businessId, onPublished }) {
                 onClick={handleConfirmPublish}
                 disabled={publishing || claimsPending > 0}
               >
-                {publishing ? 'Publishing…' : isLive ? 'Update live storefront' : 'Publish storefront'}
+                {publishing ? 'Publishing…' : isLive ? 'Update live business page' : 'Publish business page'}
               </button>
             </div>
           </div>
@@ -418,13 +473,24 @@ export default function OwnerReview({ businessId, onPublished }) {
       <header className="page-head">
         <div>
           <p className="eyebrow eyebrow--coral">Step 2 · Review</p>
-          <h1 className="h-page">Here's your storefront draft</h1>
+          <h1 className="h-page">Here's your business page draft</h1>
           <p className="lede">
             Bizdwaar organised what you shared. Check each detail, fill any gaps and choose what customers
             see — only what you confirm here is published.
           </p>
         </div>
-        {isLive && <span className="status-pill status-pill--published">Live — saved changes update your storefront</span>}
+        <div className="state-badge" aria-live="polite">
+          {!isLive && <span className="status-pill status-pill--draft">Draft · not public yet</span>}
+          {isLive && !pendingLive && !dirty && <span className="status-pill status-pill--published">Live · up to date</span>}
+          {isLive && (pendingLive || dirty) && (
+            <span className="status-pill status-pill--pending">Live · changes not published yet</span>
+          )}
+          <small>
+            {isLive
+              ? 'Customers see your last published version until you publish again.'
+              : 'Nothing here is public until you publish.'}
+          </small>
+        </div>
       </header>
 
       {/* ---------- Transformation band ---------- */}
@@ -521,14 +587,14 @@ export default function OwnerReview({ businessId, onPublished }) {
               <div className="empty-inline empty-inline--action">
                 <p>
                   <strong>No products or services yet.</strong> Bizdwaar didn't find any in your description —
-                  add them here. Without any, your storefront shows your profile and enquiry form only.
+                  add them here. Without any, your business page shows your profile and enquiry form only.
                 </p>
                 <button type="button" className="btn btn--primary btn--sm" onClick={addItem}>+ Add a product or service</button>
               </div>
             )}
 
             {hasNoVisible && (
-              <p className="alert alert--warn">No items are switched on yet — your storefront will show your profile only.</p>
+              <p className="alert alert--warn">No items are switched on yet — your business page will show your profile only.</p>
             )}
 
             <div className="item-list">
@@ -536,7 +602,8 @@ export default function OwnerReview({ businessId, onPublished }) {
                 <article key={item._key || i} className={`item-card ${item.publicVisible ? 'is-visible' : ''}`}>
                   <div className="item-card__media">
                     <SmartImage
-                      src={itemImageFor(item, profile.category, i)}
+                      src={itemImageFor(item)}
+                      tone={tileToneFor(i)}
                       alt=""
                       className="item-card__img"
                       illustrative
@@ -556,7 +623,7 @@ export default function OwnerReview({ businessId, onPublished }) {
                           onChange={e => updateCatalogueItem(i, 'publicVisible', e.target.checked)}
                         />
                         <span className="switch" aria-hidden="true" />
-                        <span className="switch-field__text">{item.publicVisible ? 'Visible on storefront' : 'Hidden'}</span>
+                        <span className="switch-field__text">{item.publicVisible ? 'Visible on business page' : 'Hidden'}</span>
                       </label>
                     </div>
 
@@ -575,16 +642,25 @@ export default function OwnerReview({ businessId, onPublished }) {
                     <div className="field-pair">
                       <div className="field">
                         <label htmlFor={`it-price-${i}`}>
-                          Price {!item.price && <span className="badge badge--missing">Needs your input</span>}
+                          Price (₹ INR) {!item.price && <span className="badge badge--missing">Needs your input</span>}
                         </label>
-                        <input
-                          id={`it-price-${i}`}
-                          className={!item.price ? 'is-missing' : ''}
-                          value={item.price || ''}
-                          onChange={e => updateCatalogueItem(i, 'price', e.target.value)}
-                          placeholder="e.g. ₹280"
-                          maxLength={100}
-                        />
+                        <div className={`money-input${!item.price ? ' is-missing' : ''}${priceError(item) ? ' is-invalid' : ''}`}>
+                          <span className="money-input__symbol" aria-hidden="true">₹</span>
+                          <input
+                            id={`it-price-${i}`}
+                            inputMode="decimal"
+                            autoComplete="off"
+                            value={item.price || ''}
+                            onChange={e => updateCatalogueItem(i, 'price', e.target.value)}
+                            placeholder="e.g. 1299"
+                            maxLength={100}
+                            aria-invalid={Boolean(priceError(item))}
+                            aria-describedby={`it-price-help-${i}`}
+                          />
+                        </div>
+                        <p id={`it-price-help-${i}`} className={`field__help${priceError(item) ? ' field__help--error' : ''}`}>
+                          {priceError(item) || priceHint(item)}
+                        </p>
                       </div>
                       <div className="field">
                         <label htmlFor={`it-size-${i}`}>
@@ -624,7 +700,7 @@ export default function OwnerReview({ businessId, onPublished }) {
             {catalogue.length > 0 && (
               <>
                 <button type="button" className="add-item" onClick={addItem}>+ Add another product or service</button>
-                <p className="field__help">Images are illustrative mood photos chosen by category and are labelled as such on your storefront.</p>
+                <p className="field__help">A photo appears only when an item's name clearly matches one of our illustrative images (always labelled as such); otherwise a colour tile with its initial is shown. Uploading your own photos is planned.</p>
               </>
             )}
           </section>
@@ -704,15 +780,21 @@ export default function OwnerReview({ businessId, onPublished }) {
       <div className="action-bar">
         <div className="action-bar__status" aria-live="polite">
           {error && <span className="action-bar__error">{error}</span>}
-          {!error && saved && <span className="action-bar__ok">✓ Saved</span>}
-          {!error && !saved && <span>Changes are saved when you click Save draft or Preview.</span>}
+          {!error && saved && (
+            <span className="action-bar__ok">
+              {isLive && pendingLive ? '✓ Saved — not live yet. Preview & update to publish these changes.' : '✓ Saved'}
+            </span>
+          )}
+          {!error && !saved && (
+            <span>{dirty ? 'You have unsaved changes.' : 'Changes are saved when you click Save or Preview.'}</span>
+          )}
         </div>
         <div className="action-bar__buttons">
           <button type="button" onClick={handleSave} disabled={saving} className="btn btn--ghost">
-            {saving ? 'Saving…' : 'Save draft'}
+            {saving ? 'Saving…' : isLive ? 'Save changes' : 'Save draft'}
           </button>
           <button type="button" onClick={handlePreviewPublish} disabled={publishing || saving} className="btn btn--primary">
-            {saving ? 'Saving…' : 'Preview & publish →'}
+            {saving ? 'Saving…' : isLive ? 'Preview & update live →' : 'Preview & publish →'}
           </button>
         </div>
       </div>

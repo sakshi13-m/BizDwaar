@@ -76,7 +76,7 @@ export default function EnquiryForm({ businessSlug }) {
   const name = businessName || 'this business'
   const back = (
     <button type="button" className="btn btn--text" onClick={() => navigate(`/s/${businessSlug}`)}>
-      ← Back to {businessName || 'storefront'}
+      ← Back to {businessName || 'business page'}
     </button>
   )
 
@@ -88,7 +88,7 @@ export default function EnquiryForm({ businessSlug }) {
           <h1 className="h-page">Enquiry received</h1>
           <p className="lede">{successMessage}</p>
           <button type="button" className="btn btn--primary" onClick={() => navigate(`/s/${businessSlug}`)}>
-            Back to {businessName || 'storefront'}
+            Back to {businessName || 'business page'}
           </button>
         </div>
       </div>

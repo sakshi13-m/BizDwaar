@@ -90,7 +90,7 @@ export default function Onboarding({ onCreated }) {
           <p className="eyebrow eyebrow--coral">Step 1 · Describe</p>
           <h1 className="h-page">Tell us about your business</h1>
           <p className="lede">
-            Write the way you'd explain it to a new customer. Bizdwaar organises it into a storefront
+            Write the way you'd explain it to a new customer. Bizdwaar organises it into a business page
             draft — you'll review every detail before anything goes live.
           </p>
         </div>

@@ -3,12 +3,24 @@ import SmartImage from '../components/SmartImage'
 import StorefrontView from '../components/StorefrontView'
 import { navigate } from '../lib/navigate'
 import { DEMO_STOREFRONT } from '../lib/demoData'
+import { formatPrice } from '../../../shared/price.js'
 import '../styles/App.css'
 import '../styles/Storefront.css'
 
 function scrollToId(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
+
+// The full owner journey, Describe → Update
+const JOURNEY = [
+  { title: 'Describe', line: 'Tell us about your business in everyday words.', tone: 'coral' },
+  { title: 'Organise', line: 'AI drafts your profile and catalogue — and asks about anything missing.', tone: 'mango' },
+  { title: 'Approve', line: 'You check every detail and choose what customers see.', tone: 'teal' },
+  { title: 'Publish', line: 'Your business page goes live on a link you can share.', tone: 'indigo' },
+  { title: 'Connect', line: 'Customers send enquiries straight from your business page.', tone: 'coral' },
+  { title: 'Manage', line: 'Enquiries collect in your inbox — mark them replied or closed.', tone: 'mango' },
+  { title: 'Update', line: 'Change prices and products any time; publish when you\'re ready.', tone: 'teal' }
+]
 
 const CATEGORIES = [
   {
@@ -41,9 +53,10 @@ export default function LandingPage() {
           <button type="button" onClick={() => scrollToId('how')}>How it works</button>
           <button type="button" onClick={() => scrollToId('trust')}>Trustworthy AI</button>
           <button type="button" onClick={() => scrollToId('example')}>Example</button>
+          <button type="button" onClick={() => scrollToId('plans')}>What's free</button>
         </div>
         <button type="button" className="btn btn--primary btn--sm" onClick={() => navigate('/owner')}>
-          Create your storefront
+          Create your business page
         </button>
       </nav>
 
@@ -56,18 +69,19 @@ export default function LandingPage() {
             <em>Big digital dreams.</em>
           </h1>
           <p className="hero__lede">
-            Your business has a story. Bizdwaar helps turn it into a beautiful online storefront —
-            with AI that organises your ideas while you stay in control.
+            Bizdwaar helps home-based makers, boutiques and small service providers across India get
+            online. Describe your business in your own words — AI organises it into a business page
+            customers can browse and enquire from, and you approve every detail.
           </p>
           <div className="hero__actions">
             <button type="button" className="btn btn--primary btn--lg" onClick={() => navigate('/owner')}>
-              Create your storefront <Arrow />
+              Create your business page <Arrow />
             </button>
             <button type="button" className="btn btn--ghost btn--lg" onClick={() => scrollToId('how')}>
               See how it works
             </button>
           </div>
-          <p className="hero__note">Free for the hackathon pilot · No sign-up forms · You approve everything</p>
+          <p className="hero__note">Free business page · No sign-up forms · You approve everything</p>
         </div>
 
         <div className="hero__media">
@@ -124,9 +138,9 @@ export default function LandingPage() {
                 </div>
               </div>
               <ul className="mini-store__list">
-                <li><span>Hand-poured Jar Candle</span><span className="price-chip">₹350</span></li>
-                <li><span>Painted Terracotta Planter</span><span className="price-chip">₹450</span></li>
-                <li><span>Block-print Cotton Dupatta</span><span className="price-chip">₹890</span></li>
+                {DEMO_STOREFRONT.catalogue.map(item => (
+                  <li key={item.name}><span>{item.name}</span><span className="price-chip">{formatPrice(item.price)}</span></li>
+                ))}
               </ul>
               <span className="mini-store__cta">Send an enquiry</span>
             </div>
@@ -166,7 +180,7 @@ export default function LandingPage() {
         <div className="container">
           <div className="section-head section-head--left">
             <p className="eyebrow eyebrow--teal">How it works</p>
-            <h2 className="h-section">From a simple idea to your own storefront</h2>
+            <h2 className="h-section">From a simple idea to your own business page</h2>
           </div>
 
           <ol className="steps">
@@ -208,6 +222,29 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ---------- Journey: positioning + Describe → Update ---------- */}
+      <section className="section journey" id="journey">
+        <div className="container">
+          <div className="section-head">
+            <p className="eyebrow eyebrow--coral">Not a one-time website</p>
+            <h2 className="h-section">Your business doesn't stand still. Your digital presence shouldn't either.</h2>
+            <p className="section-lede">
+              Bizdwaar stays with you after launch — customers reach you from your business page, and you
+              keep it current as your products, prices and seasons change.
+            </p>
+          </div>
+          <ol className="journey__track">
+            {JOURNEY.map((s, i) => (
+              <li key={s.title} className={`journey__step journey__step--${s.tone}`}>
+                <span className="journey__num">{i + 1}</span>
+                <h3>{s.title}</h3>
+                <p>{s.line}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
       {/* ---------- Section 3: trust ---------- */}
       <section className="section trust" id="trust">
         <div className="container trust__grid">
@@ -224,7 +261,7 @@ export default function LandingPage() {
                 <li key={x}><CrossIcon /> {x}</li>
               ))}
             </ul>
-            <p className="trust__foot">Nothing appears on your storefront until you confirm it.</p>
+            <p className="trust__foot">Nothing appears on your business page until you confirm it.</p>
           </div>
 
           <div className="trust__demo" aria-label="Example of an AI-organised profile">
@@ -255,12 +292,12 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ---------- Section 4: example storefront ---------- */}
+      {/* ---------- Section 4: example business page ---------- */}
       <section className="section example" id="example">
         <div className="container">
           <div className="section-head">
             <p className="eyebrow eyebrow--coral">See the result</p>
-            <h2 className="h-section">A storefront that feels like your own website</h2>
+            <h2 className="h-section">A business page that feels like your own website</h2>
             <p className="section-lede">This is the page customers see when you share your link.</p>
           </div>
           <div className="browser">
@@ -299,9 +336,47 @@ export default function LandingPage() {
             </li>
             <li>
               <span className="benefit-icon benefit-icon--indigo"><ChatIcon /></span>
-              <div><h3>A direct enquiry channel</h3><p>Customers message you from the storefront; enquiries collect in your inbox.</p></div>
+              <div><h3>A direct enquiry channel</h3><p>Customers message you from the business page; enquiries collect in your inbox.</p></div>
             </li>
           </ul>
+        </div>
+      </section>
+
+      {/* ---------- What's free / what's next ---------- */}
+      <section className="section plans" id="plans">
+        <div className="container">
+          <div className="section-head">
+            <p className="eyebrow eyebrow--teal">What you get</p>
+            <h2 className="h-section">Start free. Grow when you're ready.</h2>
+          </div>
+          <div className="plans__grid">
+            <article className="plan plan--free">
+              <span className="plan__tag">Available now · Free</span>
+              <h3>Bizdwaar business page</h3>
+              <p className="plan__url">bizdwaar.in/s/your-business</p>
+              <ul className="plan__list">
+                <li>AI-organised profile and product catalogue</li>
+                <li>Prices shown clearly in rupees (₹)</li>
+                <li>You approve everything before it's public</li>
+                <li>Mobile-friendly page with a shareable link</li>
+                <li>Customer enquiries in your own inbox</li>
+                <li>Update your products and prices any time</li>
+              </ul>
+              <button type="button" className="btn btn--primary" onClick={() => navigate('/owner')}>
+                Create your free business page <Arrow />
+              </button>
+            </article>
+            <article className="plan plan--later">
+              <span className="plan__tag plan__tag--soon">Planned · not available yet</span>
+              <h3>Your own domain</h3>
+              <p>Search for and connect a domain such as <strong>sarasstudio.in</strong> as an optional paid upgrade. The domain would belong to you.</p>
+            </article>
+            <article className="plan plan--later">
+              <span className="plan__tag plan__tag--soon">Planned · not available yet</span>
+              <h3>Premium website setup</h3>
+              <p>Help from a person to set up and personalise a fuller website when your business is ready for it.</p>
+            </article>
+          </div>
         </div>
       </section>
 
@@ -312,7 +387,7 @@ export default function LandingPage() {
           <h2 className="display display--light">Your business deserves its own doorway.</h2>
           <p>Describe your business, review what Bizdwaar organises, and publish — in minutes.</p>
           <button type="button" className="btn btn--mango btn--lg" onClick={() => navigate('/owner')}>
-            Create your storefront <Arrow />
+            Create your business page <Arrow />
           </button>
         </div>
       </section>

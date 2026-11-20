@@ -66,13 +66,13 @@ export default function OwnerInbox({ businessId, businessName, storefrontUrl, on
 
   return (
     <div className="inbox">
-      <button type="button" className="btn btn--text" onClick={onBack}>← Back to storefront settings</button>
+      <button type="button" className="btn btn--text" onClick={onBack}>← Back to business page settings</button>
 
       <header className="page-head">
         <div>
           <p className="eyebrow eyebrow--coral">Inbox</p>
           <h1 className="h-page">Customer enquiries</h1>
-          {businessName && <p className="lede">Messages sent to {businessName} from your storefront. They're private and never shown publicly.</p>}
+          {businessName && <p className="lede">Messages sent to {businessName} from your business page. They're private and never shown publicly.</p>}
         </div>
         {!loading && !error && (counts.new || 0) > 0 && (
           <span className="status-pill status-pill--draft">{counts.new} new</span>
@@ -97,9 +97,9 @@ export default function OwnerInbox({ businessId, businessName, storefrontUrl, on
         <div className="inbox-empty">
           <div className="inbox-empty__arch" aria-hidden="true" />
           <h2>No enquiries yet</h2>
-          <p>Share your storefront link with customers — their messages will appear here.</p>
+          <p>Share your business page link with customers — their messages will appear here.</p>
           {storefrontUrl && (
-            <a className="btn btn--primary" href={storefrontUrl} target="_blank" rel="noreferrer">Open my storefront</a>
+            <a className="btn btn--primary" href={storefrontUrl} target="_blank" rel="noreferrer">Open my business page</a>
           )}
         </div>
       )}

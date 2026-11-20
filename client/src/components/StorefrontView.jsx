@@ -1,6 +1,7 @@
 import SmartImage from './SmartImage'
 import { LogoMark } from './Brand'
-import { heroImageFor, itemImageFor } from '../lib/imagery'
+import { heroImageFor, itemImageFor, tileToneFor } from '../lib/imagery'
+import { formatPrice, PRICE_ON_REQUEST } from '../../../shared/price.js'
 import '../styles/Storefront.css'
 
 /**
@@ -91,7 +92,8 @@ export default function StorefrontView({ business, mode = 'live', onEnquire }) {
             {catalogue.map((item, i) => (
               <article key={i} className="product-card">
                 <SmartImage
-                  src={itemImageFor(item, business.category, i)}
+                  src={itemImageFor(item)}
+                  tone={tileToneFor(i)}
                   alt=""
                   className="product-card__img"
                   illustrative
@@ -101,9 +103,9 @@ export default function StorefrontView({ business, mode = 'live', onEnquire }) {
                   <h3 className="product-card__name">{item.name || 'Offering'}</h3>
                   {item.description && <p className="product-card__desc">{item.description}</p>}
                   <div className="product-card__meta">
-                    {item.price
-                      ? <span className="price-chip">{item.price}</span>
-                      : <span className="price-chip price-chip--ask">Ask for price</span>}
+                    {formatPrice(item.price) !== null
+                      ? <span className="price-chip" aria-label={`Price ${formatPrice(item.price)}`}>{formatPrice(item.price)}</span>
+                      : <span className="price-chip price-chip--ask">{PRICE_ON_REQUEST}</span>}
                     {item.unitOrSize && <span className="size-text">{item.unitOrSize}</span>}
                   </div>
                   {AVAILABILITY[item.availability] && (
@@ -156,7 +158,7 @@ export default function StorefrontView({ business, mode = 'live', onEnquire }) {
       <footer className="sf-footer">
         <span>© {new Date().getFullYear()} {business.name}</span>
         <span className="sf-footer__attr">
-          Storefront made with <LogoMark size={16} /> <strong>Bizdwaar</strong>
+          Business page made with <LogoMark size={16} /> <strong>Bizdwaar</strong>
         </span>
       </footer>
     </div>

@@ -1,6 +1,6 @@
-// Category-based ILLUSTRATIVE imagery.
-// Storefront items have no uploaded photos, so we show a mood image chosen from the
-// business category / item name. These are always labelled "Illustrative image" in the UI
+// ILLUSTRATIVE imagery.
+// Items have no uploaded photos. The hero shows a mood image chosen from the business
+// category; a product shows a photo only when its own name clearly matches one. These are always labelled "Illustrative image" in the UI
 // and must never be presented as the owner's actual product.
 
 const SETS = {
@@ -40,8 +40,30 @@ export function heroImageFor(category, name) {
   return theme ? HEROES[theme] : '/images/maker-hand-dipped.jpg'
 }
 
-export function itemImageFor(item, businessCategory, index = 0) {
-  const theme = detectTheme(item?.name, item?.description, businessCategory)
-  const set = SETS[theme] || SETS.crafts
-  return set[index % set.length]
+// Product photos: only when the item's OWN name/description clearly matches what a stock
+// photo shows. The business category is deliberately ignored here — otherwise every item
+// of a candle studio would get a candle photo. No match → null, and the card shows a
+// branded tile instead of a misleading picture.
+const ITEM_RULES = [
+  [/tea\s?-?lights?/i, '/images/candle-tealight.jpg'],
+  [/\bdiyas?\b/i, '/images/candle-diya.jpg'],
+  [/\bjar\b.*\bcandles?\b|\bcandles?\b.*\bjar\b/i, '/images/candle-jar-glass.jpg'],
+  [/\bcandles?\b/i, '/images/candle-jar-dark.jpg'],
+  [/terracotta|pottery|\bclay\b|earthen|\bmatka\b|\bkulhads?\b/i, '/images/cat-crafts.jpg'],
+  [/dupatta|\bscarf\b|\bscarves\b|\bstoles?\b|chunni|odhni|\bshawls?\b/i, '/images/cat-fashion.jpg'],
+  [/jalebi/i, '/images/cat-food.jpg'],
+  [/mithai|\bsweets\b|\bsweet box|ladoo|laddu|barfi|burfi|\bpeda\b|kaju katli|halwa/i, '/images/food-sweets-box.jpg']
+]
+
+export function itemImageFor(item) {
+  const text = [item?.name, item?.description].filter(Boolean).join(' ')
+  if (!text) return null
+  for (const [re, src] of ITEM_RULES) if (re.test(text)) return src
+  return null
+}
+
+// Brand colour for a product tile when there is no matching photo
+const TILE_TONES = ['teal', 'coral', 'indigo', 'mango']
+export function tileToneFor(index = 0) {
+  return TILE_TONES[index % TILE_TONES.length]
 }

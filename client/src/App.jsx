@@ -89,7 +89,7 @@ function MyStorefronts({ businesses, onOpen }) {
     <section className="my-stores">
       <div className="my-stores__head">
         <h2>Welcome back</h2>
-        <p>Continue with a storefront you started in this browser, or create a new one below.</p>
+        <p>Continue with a business page you started in this browser, or create a new one below.</p>
       </div>
       <div className="my-stores__list">
         {businesses.map(b => (
@@ -103,7 +103,7 @@ function MyStorefronts({ businesses, onOpen }) {
         ))}
       </div>
       <p className="my-stores__note">
-        Storefronts are managed from the browser they were created in during this hackathon version.
+        Business pages are managed from the browser they were created in during this hackathon version.
       </p>
     </section>
   )
@@ -265,7 +265,7 @@ function OwnerFlow() {
           <div className="published__body">
             <p className="eyebrow eyebrow--coral">You're live</p>
             <h1 className="display display--md">
-              {publishedName ? <>{publishedName} is open for business.</> : <>Your storefront is open for business.</>}
+              {publishedName ? <>{publishedName} is open for business.</> : <>Your business page is live.</>}
             </h1>
             <p className="lede">Share this link anywhere your customers already are — chats, social profiles, product labels.</p>
 
@@ -277,12 +277,12 @@ function OwnerFlow() {
             </div>
 
             <div className="published__actions">
-              <a href={url} target="_blank" rel="noreferrer" className="btn btn--primary">View my storefront</a>
+              <a href={url} target="_blank" rel="noreferrer" className="btn btn--primary">View my business page</a>
               <button type="button" className="btn btn--ghost" onClick={() => setStep('inbox')}>View enquiries</button>
               <button type="button" className="btn btn--ghost" onClick={() => { setBusinessId(publishedBusinessId); setStep('review') }}>
-                Edit storefront
+                Edit business page
               </button>
-              <button type="button" className="btn btn--text" onClick={startNew}>Create another storefront</button>
+              <button type="button" className="btn btn--text" onClick={startNew}>Create another business page</button>
             </div>
           </div>
         </section>

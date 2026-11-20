@@ -31,7 +31,7 @@ export default function PublicStorefront({ slug }) {
         setLoading(false)
       })
       .catch(() => {
-        setError('Could not load this storefront. Please try again later.')
+        setError('Could not load this business page. Please try again later.')
         setLoading(false)
       })
   }, [slug])
@@ -45,7 +45,7 @@ export default function PublicStorefront({ slug }) {
     return (
       <div className="sf-state">
         <span className="spinner" aria-hidden="true" />
-        <p>Opening storefront…</p>
+        <p>Opening business page…</p>
       </div>
     )
   }
@@ -55,10 +55,10 @@ export default function PublicStorefront({ slug }) {
       <div className="sf-state">
         <Logo />
         <div className="sf-state__card">
-          <h1>{error ? 'Something went wrong' : 'Storefront not found'}</h1>
+          <h1>{error ? 'Something went wrong' : 'Business page not found'}</h1>
           <p>
             {error ||
-              "This storefront doesn't exist or isn't published yet. Double-check the link you were given."}
+              "This business page doesn't exist or isn't published yet. Double-check the link you were given."}
           </p>
           <button type="button" className="btn btn--primary" onClick={() => navigate('/')}>Visit Bizdwaar</button>
         </div>
