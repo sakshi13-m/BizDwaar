@@ -52,3 +52,10 @@ export async function publishBusiness(id) {
   })
   return res.json()
 }
+
+export async function getEnquiries(businessId) {
+  const res = await fetch(`/api/owner/businesses/${businessId}/enquiries`, {
+    credentials: 'include'
+  })
+  return res.json()
+}

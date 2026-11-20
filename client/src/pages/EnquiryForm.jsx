@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import '../styles/App.css'
 
+function navigate(path) {
+  window.history.pushState({}, '', path)
+  window.dispatchEvent(new PopStateEvent('popstate'))
+}
+
 export default function EnquiryForm({ businessSlug }) {
   const [form, setForm] = useState({
     customerName: '',
@@ -22,19 +27,31 @@ export default function EnquiryForm({ businessSlug }) {
     setError('')
     setLoading(true)
 
-    const res = await fetch('/api/enquiries', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, businessSlug })
-    })
+    try {
+      const res = await fetch('/api/enquiries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, businessSlug })
+      })
 
-    const data = await res.json()
-    setLoading(false)
+      let data
+      try {
+        data = await res.json()
+      } catch {
+        data = {}
+      }
 
-    if (data.ok) {
+      setLoading(false)
+
+      if (!res.ok || !data.ok) {
+        setError(data.message || 'Something went wrong. Please try again.')
+        return
+      }
+
       setSuccess(true)
-    } else {
-      setError(data.message || 'Something went wrong. Please try again.')
+    } catch {
+      setLoading(false)
+      setError('Network error — please check your connection and try again.')
     }
   }
 
@@ -42,11 +59,15 @@ export default function EnquiryForm({ businessSlug }) {
     return (
       <div className="page-center">
         <div className="card">
-          <h2>✅ Enquiry sent!</h2>
-          <p className="hint">The business owner will get back to you soon.</p>
-          <a href={`/b/${businessSlug}`} className="btn-secondary" style={{ marginTop: '1rem', display: 'inline-block', textDecoration: 'none' }}>
+          <h2 style={{ marginBottom: '0.75rem' }}>Enquiry sent</h2>
+          <p className="hint">Your enquiry has been received. The business owner will be in touch.</p>
+          <button
+            className="btn-secondary"
+            style={{ marginTop: '1rem' }}
+            onClick={() => navigate(`/s/${businessSlug}`)}
+          >
             ← Back to storefront
-          </a>
+          </button>
         </div>
       </div>
     )
@@ -56,7 +77,7 @@ export default function EnquiryForm({ businessSlug }) {
     <div className="page">
       <div className="card wide">
         <h2>Send an enquiry</h2>
-        <p className="hint">The business owner will receive your message via email.</p>
+        <p className="hint">Fill in your details and the owner will get back to you.</p>
         <form onSubmit={handleSubmit} className="form">
           <label htmlFor="customerName">Your name *</label>
           <input
@@ -111,6 +132,14 @@ export default function EnquiryForm({ businessSlug }) {
             {loading ? 'Sending…' : 'Send enquiry'}
           </button>
         </form>
+
+        <button
+          className="btn-secondary"
+          style={{ marginTop: '1rem' }}
+          onClick={() => navigate(`/s/${businessSlug}`)}
+        >
+          ← Back to storefront
+        </button>
       </div>
     </div>
   )

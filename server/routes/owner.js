@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { z } from 'zod'
 import { requireOwner } from '../middleware/ownerAuth.js'
 import Business from '../models/Business.js'
+import Enquiry from '../models/Enquiry.js'
 import { analyseBusinessInput } from '../services/claudeService.js'
 
 const router = Router()
@@ -198,6 +199,16 @@ router.post('/businesses/:id/publish', requireOwner, async (req, res) => {
   const saved = await Business._save(business)
 
   return res.json({ ok: true, slug: saved.slug, publishedAt: saved.publishedAt })
+})
+
+// -------------------------------------------------------
+// GET /api/owner/businesses/:id/enquiries  (owner only)
+// -------------------------------------------------------
+router.get('/businesses/:id/enquiries', requireOwner, async (req, res) => {
+  const business = await Business.findById(req.params.id)
+  if (!business) return res.status(404).json({ error: 'not_found', message: 'Business not found.' })
+  const enquiries = await Enquiry.findByBusinessId(business.id)
+  return res.json({ ok: true, enquiries })
 })
 
 export default router

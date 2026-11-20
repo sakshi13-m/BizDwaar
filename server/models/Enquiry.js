@@ -57,6 +57,15 @@ const Enquiry = {
     return deserialise(rows[0])
   },
 
+  async findByBusinessId(businessId, limit = 50) {
+    const db = getPool()
+    const [rows] = await db.execute(
+      'SELECT * FROM enquiries WHERE business_id = ? ORDER BY created_at DESC LIMIT ?',
+      [businessId, limit]
+    )
+    return rows.map(deserialise)
+  },
+
   async deleteMany({ businessId } = {}) {
     const db = getPool()
     if (businessId) {

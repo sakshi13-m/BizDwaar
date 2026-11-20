@@ -10,10 +10,10 @@
 
 | Environment | URL |
 |---|---|
-| Production | https://bizdwaar.in *(DNS propagating — available shortly)* |
+| Production | https://bizdwaar.in |
 | Direct | https://t3xjlpgdqh.c36.airoapp.ai |
 
-Owner token for demo: `bizdwaar-admin`
+Owner access: use the token configured in your GoDaddy hosting secrets.
 
 ---
 
