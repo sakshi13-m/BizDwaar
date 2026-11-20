@@ -11,6 +11,8 @@ function deserialise(row) {
     customerEmail:           row.customer_email,
     customerPhone:           row.customer_phone,
     message:                 row.message,
+    productName:             row.product_name || null,
+    status:                  row.status || 'new',
     notificationStatus:      row.notification_status,
     notificationAttemptedAt: row.notification_attempted_at,
     createdAt:               row.created_at,
@@ -24,8 +26,8 @@ const Enquiry = {
     const id = randomUUID()
     await db.execute(
       `INSERT INTO enquiries
-        (id, business_id, customer_name, customer_email, customer_phone, message, notification_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        (id, business_id, customer_name, customer_email, customer_phone, message, product_name, notification_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         data.businessId,
@@ -33,6 +35,7 @@ const Enquiry = {
         data.customerEmail || null,
         data.customerPhone || null,
         data.message,
+        data.productName || null,
         data.notificationStatus || 'pending',
       ]
     )
@@ -64,6 +67,18 @@ const Enquiry = {
       [businessId, limit]
     )
     return rows.map(deserialise)
+  },
+
+  // Scoped by business so an owner can only change enquiries sent to their own business
+  async updateStatus(id, businessId, status) {
+    const existing = await Enquiry.findById(id)
+    if (!existing || existing.businessId !== businessId) return null
+    const db = getPool()
+    await db.execute(
+      'UPDATE enquiries SET status = ? WHERE id = ? AND business_id = ?',
+      [status, id, businessId]
+    )
+    return Enquiry.findById(id)
   },
 
   async deleteMany({ businessId } = {}) {

@@ -69,5 +69,12 @@ export default function PublicStorefront({ slug }) {
   // Server already returns only approved, visible items — this is a defensive re-check
   const visible = { ...business, catalogue: (business.catalogue || []).filter(item => item.publicVisible !== false) }
 
-  return <StorefrontView business={visible} mode="live" onEnquire={() => navigate(`/enquiry/${slug}`)} />
+  return (
+    <StorefrontView
+      business={visible}
+      mode="live"
+      onEnquire={(itemName) =>
+        navigate(`/enquiry/${slug}${itemName ? `?item=${encodeURIComponent(itemName)}` : ''}`)}
+    />
+  )
 }

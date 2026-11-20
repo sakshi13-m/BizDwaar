@@ -65,30 +65,53 @@ async function initSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `)
 
-  await migrateOwnerSessionHash()
+  await runAdditiveMigrations()
 
   console.log('DB schema ready')
 }
 
-// Additive, idempotent migration: nullable owner_session_hash + index.
-// Existing rows keep NULL (reachable only via the optional admin fallback).
-async function migrateOwnerSessionHash() {
-  const db = pool
-  const [cols] = await db.execute(
+// -------------------------------------------------------
+// Additive, idempotent migrations. Never drop or rewrite existing data.
+// -------------------------------------------------------
+async function columnExists(table, column) {
+  const [rows] = await pool.execute(
     `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'businesses' AND COLUMN_NAME = 'owner_session_hash'`
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [table, column]
   )
-  if (Number(cols[0].n) === 0) {
-    await db.execute('ALTER TABLE businesses ADD COLUMN owner_session_hash CHAR(64) NULL DEFAULT NULL')
-    console.log('Migration: added businesses.owner_session_hash')
-  }
+  return Number(rows[0].n) > 0
+}
 
-  const [idx] = await db.execute(
+async function indexExists(table, index) {
+  const [rows] = await pool.execute(
     `SELECT COUNT(*) AS n FROM information_schema.STATISTICS
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'businesses' AND INDEX_NAME = 'idx_owner_session_hash'`
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+    [table, index]
   )
-  if (Number(idx[0].n) === 0) {
-    await db.execute('CREATE INDEX idx_owner_session_hash ON businesses (owner_session_hash)')
-    console.log('Migration: added index idx_owner_session_hash')
+  return Number(rows[0].n) > 0
+}
+
+// Table/column/DDL values below are fixed literals, never user input
+async function addColumnIfMissing(table, column, definition) {
+  if (!(await columnExists(table, column))) {
+    await pool.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+    console.log(`Migration: added ${table}.${column}`)
   }
+}
+
+async function addIndexIfMissing(table, index, columns) {
+  if (!(await indexExists(table, index))) {
+    await pool.execute(`CREATE INDEX ${index} ON ${table} (${columns})`)
+    console.log(`Migration: added index ${index}`)
+  }
+}
+
+async function runAdditiveMigrations() {
+  // Anonymous owner sessions — existing rows keep NULL (admin fallback only)
+  await addColumnIfMissing('businesses', 'owner_session_hash', 'CHAR(64) NULL DEFAULT NULL')
+  await addIndexIfMissing('businesses', 'idx_owner_session_hash', 'owner_session_hash')
+
+  // Enquiry management — existing enquiries become 'new'; product interest stays NULL
+  await addColumnIfMissing('enquiries', 'status', "ENUM('new','replied','closed') NOT NULL DEFAULT 'new'")
+  await addColumnIfMissing('enquiries', 'product_name', 'VARCHAR(200) NULL DEFAULT NULL')
 }

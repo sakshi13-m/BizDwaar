@@ -30,6 +30,7 @@ Business: ${business.name}
 Customer: ${enquiry.customerName}
 Email: ${enquiry.customerEmail || 'Not provided'}
 Phone: ${enquiry.customerPhone || 'Not provided'}
+Interested in: ${enquiry.productName || 'General enquiry'}
 
 Message:
 ${enquiry.message}

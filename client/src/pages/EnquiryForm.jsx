@@ -10,8 +10,10 @@ export default function EnquiryForm({ businessSlug }) {
     customerEmail: '',
     customerPhone: '',
     message: '',
+    productName: new URLSearchParams(window.location.search).get('item') || '',
     website: '' // honeypot
   })
+  const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
@@ -22,7 +24,14 @@ export default function EnquiryForm({ businessSlug }) {
   useEffect(() => {
     fetch(`/api/businesses/${encodeURIComponent(businessSlug)}`)
       .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (d?.ok) setBusinessName(d.business.name) })
+      .then(d => {
+        if (!d?.ok) return
+        setBusinessName(d.business.name)
+        const names = (d.business.catalogue || []).map(i => i.name).filter(Boolean)
+        setProducts(names)
+        // Drop a pre-selected item that isn't on this storefront
+        setForm(f => (f.productName && !names.includes(f.productName) ? { ...f, productName: '' } : f))
+      })
       .catch(() => {})
   }, [businessSlug])
 
@@ -136,6 +145,20 @@ export default function EnquiryForm({ businessSlug }) {
               />
             </div>
           </div>
+
+          {products.length > 0 && (
+            <div className="field">
+              <label htmlFor="productName">Interested in</label>
+              <select
+                id="productName"
+                value={form.productName}
+                onChange={e => update('productName', e.target.value)}
+              >
+                <option value="">General enquiry</option>
+                {products.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+          )}
 
           <div className="field">
             <label htmlFor="message">Your message <span className="req">*</span></label>

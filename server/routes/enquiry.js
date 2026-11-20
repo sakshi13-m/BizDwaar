@@ -27,11 +27,17 @@ const EnquirySchema = z.object({
   customerEmail: z.string().email().optional().or(z.literal('')),
   customerPhone: z.string().max(50).optional().or(z.literal('')),
   message:       z.string().min(10).max(2000),
+  // Optional: which visible catalogue item the customer is asking about
+  productName:   z.string().max(200).optional().or(z.literal('')),
   // Honeypot — normal users never fill this
   website:       z.string().max(0).optional()
 })
 
-router.post('/', enquiryLimiter, async (req, res) => {
+router.post('/', enquiryLimiter, (req, res, next) => {
+  handleEnquiry(req, res).catch(next)
+})
+
+async function handleEnquiry(req, res) {
   // Validate
   const result = EnquirySchema.safeParse(req.body)
   if (!result.success) {
@@ -42,7 +48,7 @@ router.post('/', enquiryLimiter, async (req, res) => {
     })
   }
 
-  const { businessSlug, customerName, customerEmail, customerPhone, message, website } = result.data
+  const { businessSlug, customerName, customerEmail, customerPhone, message, productName, website } = result.data
 
   // Honeypot check — if 'website' field is filled, it's a bot
   if (website && website.length > 0) {
@@ -60,6 +66,21 @@ router.post('/', enquiryLimiter, async (req, res) => {
     })
   }
 
+  // Only accept a product name that matches one of this business's publicly visible items
+  let matchedProduct = null
+  if (productName) {
+    const visibleNames = (business.approvedCatalogue || [])
+      .filter(item => item.publicVisible === true && item.name)
+      .map(item => item.name)
+    matchedProduct = visibleNames.find(n => n === productName) || null
+    if (!matchedProduct) {
+      return res.status(400).json({
+        error: 'validation_error',
+        message: 'That product is not available on this storefront.'
+      })
+    }
+  }
+
   // Persist enquiry
   const enquiry = await Enquiry.create({
     businessId: business._id,
@@ -67,6 +88,7 @@ router.post('/', enquiryLimiter, async (req, res) => {
     customerEmail: customerEmail || null,
     customerPhone: customerPhone || null,
     message,
+    productName: matchedProduct,
     notificationStatus: 'pending'
   })
 
@@ -84,11 +106,12 @@ router.post('/', enquiryLimiter, async (req, res) => {
     enquiry.notificationStatus = 'failed'
     enquiry.notificationAttemptedAt = new Date()
     await enquiry.save()
+    // Enquiry is safely stored and visible in the owner's inbox even if email fails
     return res.json({
       ok: true,
-      message: 'Your enquiry has been received. Email notification is pending.'
+      message: 'Your enquiry has been received. The owner will see it in their Bizdwaar inbox.'
     })
   }
-})
+}
 
 export default router

@@ -35,6 +35,7 @@ function toSlug(name) {
   return name
     .toLowerCase()
     .trim()
+    .replace(/['’]/g, '')          // "Sara's Studio" → "saras-studio"
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'storefront'
 }
@@ -179,7 +180,9 @@ const UpdateBusinessSchema = z.object({
     price:         z.string().max(100).nullable(),
     unitOrSize:    z.string().max(100).nullable(),
     attributes:    z.array(z.string()).default([]),
-    publicVisible: z.boolean().default(false)
+    publicVisible: z.boolean().default(false),
+    // Owner-stated only; null = not stated (nothing shown publicly)
+    availability:  z.enum(['available', 'made_to_order', 'out_of_stock']).nullable().default(null)
   })).optional()
 })
 
@@ -244,6 +247,28 @@ router.post('/businesses/:id/publish', requireOwner, requireBusinessOwnership, w
 router.get('/businesses/:id/enquiries', requireOwner, requireBusinessOwnership, wrap(async (req, res) => {
   const enquiries = await Enquiry.findByBusinessId(req.business.id)
   return res.json({ ok: true, enquiries })
+}))
+
+// -------------------------------------------------------
+// PATCH /api/owner/businesses/:id/enquiries/:enquiryId  (owner of this business)
+// Update enquiry status: new → replied → closed
+// -------------------------------------------------------
+const EnquiryStatusSchema = z.object({
+  status: z.enum(['new', 'replied', 'closed'])
+})
+
+router.patch('/businesses/:id/enquiries/:enquiryId', requireOwner, requireBusinessOwnership, wrap(async (req, res) => {
+  const result = EnquiryStatusSchema.safeParse(req.body)
+  if (!result.success) {
+    return res.status(400).json({ error: 'validation_error', message: 'Status must be new, replied or closed.' })
+  }
+
+  // Scoped to this business — an enquiry ID from another business returns 404
+  const enquiry = await Enquiry.updateStatus(req.params.enquiryId, req.business.id, result.data.status)
+  if (!enquiry) {
+    return res.status(404).json({ error: 'not_found', message: 'Enquiry not found.' })
+  }
+  return res.json({ ok: true, enquiry })
 }))
 
 export default router

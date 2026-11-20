@@ -26,7 +26,7 @@ export default function StorefrontView({ business, mode = 'live', onEnquire }) {
       )
     }
     return (
-      <button type="button" className={`btn btn--${variant}`} onClick={onEnquire}>
+      <button type="button" className={`btn btn--${variant}`} onClick={() => onEnquire()}>
         {children}
       </button>
     )
@@ -106,10 +106,18 @@ export default function StorefrontView({ business, mode = 'live', onEnquire }) {
                       : <span className="price-chip price-chip--ask">Ask for price</span>}
                     {item.unitOrSize && <span className="size-text">{item.unitOrSize}</span>}
                   </div>
+                  {AVAILABILITY[item.availability] && (
+                    <span className={`avail avail--${item.availability}`}>{AVAILABILITY[item.availability]}</span>
+                  )}
                   {item.attributes?.length > 0 && (
                     <div className="tag-row">
                       {item.attributes.map((a, j) => <span key={j} className="tag">{a}</span>)}
                     </div>
+                  )}
+                  {interactive && item.name && (
+                    <button type="button" className="product-card__ask" onClick={() => onEnquire(item.name)}>
+                      Ask about this →
+                    </button>
                   )}
                 </div>
               </article>
@@ -153,6 +161,13 @@ export default function StorefrontView({ business, mode = 'live', onEnquire }) {
       </footer>
     </div>
   )
+}
+
+// Owner-stated availability labels; anything else (null/unknown) is not shown
+const AVAILABILITY = {
+  available: 'Available',
+  made_to_order: 'Made to order',
+  out_of_stock: 'Currently out of stock'
 }
 
 function scrollTo(id) {

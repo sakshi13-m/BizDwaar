@@ -23,10 +23,18 @@ function toPayload(approved) {
       price:         blank(item.price),
       unitOrSize:    blank(item.unitOrSize),
       attributes:    item.attributes || [],
-      publicVisible: item.publicVisible === true
+      publicVisible: item.publicVisible === true,
+      availability:  item.availability || null
     }))
   }
 }
+
+const AVAILABILITY_OPTIONS = [
+  { value: '', label: 'Not stated' },
+  { value: 'available', label: 'Available' },
+  { value: 'made_to_order', label: 'Made to order' },
+  { value: 'out_of_stock', label: 'Out of stock' }
+]
 
 export default function OwnerReview({ businessId, onPublished }) {
   const [business, setBusiness] = useState(null)
@@ -63,7 +71,8 @@ export default function OwnerReview({ businessId, onPublished }) {
               price:         item.price || '',
               unitOrSize:    item.unitOrSize || '',
               attributes:    item.attributes || [],
-              publicVisible: item.publicVisible === true
+              publicVisible: item.publicVisible === true,
+              availability:  item.availability || ''
             }))
           })
           setLoading(false)
@@ -84,7 +93,8 @@ export default function OwnerReview({ businessId, onPublished }) {
             price:         item.price || '',
             unitOrSize:    item.unitOrSize || '',
             attributes:    item.attributes || [],
-            publicVisible: false   // default OFF — owner must opt in
+            publicVisible: false,  // default OFF — owner must opt in
+            availability:  ''      // never inferred by AI — owner states it
           }))
         })
       } else {
@@ -428,6 +438,19 @@ export default function OwnerReview({ businessId, onPublished }) {
                           maxLength={100}
                         />
                       </div>
+                    </div>
+
+                    <div className="field">
+                      <label htmlFor={`it-avail-${i}`}>
+                        Availability <span className="optional">only shown if you choose one</span>
+                      </label>
+                      <select
+                        id={`it-avail-${i}`}
+                        value={item.availability || ''}
+                        onChange={e => updateCatalogueItem(i, 'availability', e.target.value)}
+                      >
+                        {AVAILABILITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
                     </div>
                   </div>
                 </article>

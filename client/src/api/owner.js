@@ -82,6 +82,19 @@ export async function publishBusiness(id) {
   return parse(res)
 }
 
+export async function updateEnquiryStatus(businessId, enquiryId, status) {
+  const res = await fetch(
+    `/api/owner/businesses/${encodeURIComponent(businessId)}/enquiries/${encodeURIComponent(enquiryId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+      credentials: 'include'
+    }
+  )
+  return parse(res)
+}
+
 export async function getEnquiries(businessId) {
   const res = await fetch(`/api/owner/businesses/${encodeURIComponent(businessId)}/enquiries`, {
     credentials: 'include'

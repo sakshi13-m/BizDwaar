@@ -8,7 +8,8 @@ const router = Router()
  * Public storefront — returns only published, owner-approved fields.
  * Draft businesses return 404.
  */
-router.get('/:slug', async (req, res) => {
+router.get('/:slug', async (req, res, next) => {
+  try {
   const business = await Business.findOne({
     slug: req.params.slug,
     status: 'published'
@@ -37,12 +38,16 @@ router.get('/:slug', async (req, res) => {
         description: item.description,
         price: item.price,
         unitOrSize: item.unitOrSize,
-        attributes: item.attributes || []
+        attributes: item.attributes || [],
+        availability: item.availability || null
       })),
     publishedAt: business.publishedAt
   }
 
   return res.json({ ok: true, business: publicData })
+  } catch (err) {
+    next(err)
+  }
 })
 
 export default router
