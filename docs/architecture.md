@@ -4,6 +4,8 @@ One document covering the high-level design (system, flows) and the low-level de
 security). Diagrams are Mermaid and render on GitHub. Everything here describes code that exists in this
 repository; planned work is listed separately under [Roadmap](#7-roadmap-not-built).
 
+> The product calls the public page a **business page**; in code and API names it is a *storefront*.
+
 ---
 
 ## 1. System overview
@@ -16,7 +18,7 @@ flowchart LR
   end
 
   subgraph GoDaddy["GoDaddy Node.js hosting (bizdwaar.in, HTTPS at edge)"]
-    E[Express 4 server<br/>server/index.js]
+    E[Express 4 server<br/>server/app.js]
     S[Static React build<br/>dist/]
     E --- S
   end
@@ -35,6 +37,8 @@ flowchart LR
 - **One deployable unit.** Express serves both the API and the Vite-built React app (`dist/`), so the browser
   only ever talks to one origin. There is no separate frontend host and no CORS.
 - **Secrets stay server-side.** The Claude key, database credentials and SMTP password never reach the client.
+- **Shared price logic.** `shared/price.js` (INR parsing and `en-IN` formatting) is imported by both the
+  server and the React build, so validation and display can't drift apart.
 - **Stateless app tier.** Sessions are verified by hashing the cookie and comparing it with the database, so the
   server holds no session state. (The in-memory rate limiter is the only per-process state.)
 
@@ -58,15 +62,16 @@ sequenceDiagram
   Owner->>UI: describe business
   UI->>API: POST /api/owner/businesses
   API->>Claude: owner facts + strict "never invent" prompt
-  Claude-->>API: JSON draft (profile, items, missingQuestions, unsupportedClaims)
-  API->>API: Zod-validate draft (failure ⇒ empty draft, owner input kept)
+  Claude-->>API: JSON draft (profile, items with INR prices, missingQuestions, unsupportedClaims)
+  API->>API: Zod-validate draft, prices → numbers (failure ⇒ empty draft, owner input kept)
   API->>DB: INSERT business (status=draft, owner_session_hash)
   Owner->>UI: review, answer questions, choose visible items
-  UI->>API: PUT /api/owner/businesses/:id (approved data)
+  UI->>API: PUT /api/owner/businesses/:id (approved working copy, private)
   UI->>API: POST /api/owner/businesses/:id/publish
-  API->>DB: status=published
+  API->>DB: copy approved_* → published_*, status=published
   Customer->>API: GET /api/businesses/:slug
-  API-->>Customer: allowlisted approved fields only
+  API-->>Customer: allowlisted published fields, visible items only
+  Owner->>API: later edits: PUT (stay private) … publish again to go live
   Customer->>API: POST /api/enquiries (optional productName)
   API->>DB: INSERT enquiry (status=new)
   API--)API: try SMTP notification (failure recorded, not shown to customer)
@@ -81,9 +86,9 @@ The AI is a **drafting assistant with no authority to publish**. Trust is enforc
 
 | Layer | Mechanism | Where |
 |---|---|---|
-| Prompt | Use only owner-provided facts; prices, sizes, ingredients, certifications, stock, delivery and quality claims must be `null` if absent; list missing facts as questions; list unverifiable claims separately. | `server/services/claudeService.js` |
-| Schema | Claude's JSON is parsed and validated with Zod. Anything malformed is rejected, and the owner's input is kept with an empty draft. | `ClaudeOutputSchema` |
-| Separation of data | `ai_draft` (what Claude said) is stored separately from `approved_profile` / `approved_catalogue` (what the owner confirmed). Only approved data is ever public. | `businesses` table |
+| Prompt | Use only owner-provided facts; prices, sizes, ingredients, certifications, stock, delivery and quality claims must be `null` if absent; a stated price is returned as a plain rupee number; list missing facts as questions; list unverifiable claims separately. | `server/services/claudeService.js` |
+| Schema | Claude's JSON is parsed and validated with Zod. Text prices are converted to numbers; ranges or vague prices become `null` (asked, never guessed). Anything malformed is rejected, and the owner's input is kept with an empty draft. | `ClaudeOutputSchema` |
+| Separation of data | `ai_draft` (what Claude said), `approved_*` (the owner's saved working copy) and `published_*` (the snapshot taken at publish) are stored separately. Only the published snapshot is ever public. | `businesses` table |
 | UX | Fields show an *AI suggestion* or *Confirmed by you* badge. Missing facts become questions with **Answer** buttons. Flagged claims are kept out of the summary and must be reviewed before the publish button enables. Items start hidden; availability is only shown if the owner sets it. The preview is the real page. | `client/src/pages/OwnerReview.jsx` |
 
 ```mermaid
@@ -95,8 +100,9 @@ flowchart TD
   B --> F{Unverifiable claim?}
   F -- yes --> G[Kept out of summary<br/>owner must review]
   D & E & G --> H[Owner edits / answers / approves]
-  H --> I[(approved_* columns)]
-  I --> J[Public storefront]
+  H --> I[(approved_* columns<br/>private working copy)]
+  I -- owner publishes --> P[(published_* snapshot)]
+  P --> J[Public business page]
   B -. never .-> J
 ```
 
@@ -115,8 +121,10 @@ erDiagram
     varchar location
     json owner_input "owner's original words"
     json ai_draft "Claude output, never public"
-    json approved_profile "owner-confirmed profile"
-    json approved_catalogue "owner-confirmed items"
+    json approved_profile "owner's saved working copy"
+    json approved_catalogue "owner's saved items"
+    json published_profile "snapshot at publish, public, nullable"
+    json published_catalogue "snapshot at publish, public, nullable"
     enum status "draft | published"
     datetime published_at
     char64 owner_session_hash "SHA-256 of session secret, nullable"
@@ -142,12 +150,14 @@ erDiagram
 **JSON shapes**
 
 ```jsonc
-// approved_profile
+// approved_profile  (published_profile has the same shape)
 { "businessName": "...", "description": "...", "category": "...", "location": "...",
   "contactEmail": "... | null", "contactPhone": "... | null" }
 
-// approved_catalogue[] item
-{ "name": "...", "description": "...", "price": "₹350 | null", "unitOrSize": "200g | null",
+// approved_catalogue[] item  (published_catalogue has the same shape)
+// price: INR amount as a number (1299, 250.5) or null = "Price on request".
+// Rows saved before numeric prices may hold text such as "₹350"; it is read as INR on display.
+{ "name": "...", "description": "...", "price": 1299, "unitOrSize": "200g | null",
   "attributes": ["..."], "publicVisible": false,
   "availability": "available | made_to_order | out_of_stock | null" }
 
@@ -160,7 +170,8 @@ erDiagram
 **Migrations.** `server/db.js` creates the tables if they are missing, then runs *additive, idempotent*
 migrations: it checks `information_schema` and only adds a column or index if it is absent. It never drops or
 rewrites data. Existing rows get safe defaults (`owner_session_hash` NULL, `status` `'new'`,
-`product_name` NULL).
+`product_name` NULL, `published_profile` / `published_catalogue` NULL). A published page whose snapshot is
+NULL keeps serving `approved_*` exactly as before, until the owner next publishes.
 
 ---
 
@@ -172,19 +183,19 @@ rewrites data. Existing rows get safe defaults (`owner_session_hash` NULL, `stat
 | POST | `/api/owner/session` | — | — | `201 { created: true }` + cookie, or `200 { created: false }` |
 | GET | `/api/owner/businesses` | session | — | `{ businesses: [{ id, name, slug, status, … }] }` |
 | POST | `/api/owner/businesses` | session, 10/h/IP | `{ businessName, businessType?, location?, description, productsRaw? }` | `201 { businessId, slug }` |
-| GET | `/api/owner/businesses/:id` | owner | — | `{ business }` (no session hash) |
-| PUT | `/api/owner/businesses/:id` | owner | `{ approvedProfile?, approvedCatalogue? }` | `{ business }` |
-| POST | `/api/owner/businesses/:id/publish` | owner | — | `{ slug, publishedAt }` or `422` if name/description missing |
+| GET | `/api/owner/businesses/:id` | owner | — | `{ business }` incl. `hasUnpublishedChanges` (no session hash) |
+| PUT | `/api/owner/businesses/:id` | owner | `{ approvedProfile?, approvedCatalogue? }` — `price` a number (or numeric text) or `null` | `{ business }` · `400` with a readable message if a price isn't a rupee amount |
+| POST | `/api/owner/businesses/:id/publish` | owner | — | copies the saved copy to the public snapshot · `{ slug, publishedAt }` or `422` if name/description missing |
 | GET | `/api/owner/businesses/:id/enquiries` | owner | — | `{ enquiries: [...] }` (latest 50) |
 | PATCH | `/api/owner/businesses/:id/enquiries/:enquiryId` | owner | `{ status }` | `{ enquiry }` · `404` if not this business's |
-| POST | `/api/owner/login` | — | `{ token }` | admin cookie (optional fallback) |
+| POST | `/api/owner/login` | —, 10/15 min/IP | `{ token }` | admin cookie (optional fallback; token must be ≥ 32 chars) |
 | POST | `/api/owner/logout` | — | — | clears cookies |
 | POST | `/api/ai/analyse` | session, 10/h/IP | as create | `{ draft }` (not saved) |
-| GET | `/api/businesses/:slug` | — | — | allowlisted public business, visible items only |
+| GET | `/api/businesses/:slug` | — | — | published snapshot, allowlisted, visible items only, `currency: "INR"` |
 | POST | `/api/enquiries` | —, 3/h/IP | `{ businessSlug, customerName, customerEmail?, customerPhone?, message, productName?, website(honeypot) }` | `{ ok, message }` |
 
-Errors are JSON: `{ error, message }`, with status codes 400 (validation), 401 (no session), 403 (not your
-business), 404, 422 (publish blocked), 429 (rate limit) and 500.
+Errors are JSON: `{ error, message }`, with status codes 400 (validation or malformed body), 401 (no session),
+403 (not your business), 404 (including unknown API routes), 422 (publish blocked), 429 (rate limit) and 500.
 
 ---
 
@@ -208,11 +219,12 @@ flowchart LR
 | Owner identity | Server-generated 32-byte random secret; `HttpOnly`, `SameSite=Strict`, `Secure` (prod), 30 days. Only the SHA-256 hash is stored, and comparisons are constant-time. |
 | Authorisation | `requireOwner` and `requireBusinessOwnership` on every business route; enquiry updates are scoped by `business_id`. Changing an ID in the URL cannot reach another owner's data. |
 | CSRF | `SameSite=Strict` cookies; JSON-only state-changing endpoints. |
-| Data exposure | The public endpoint builds an explicit allowlist. `owner_input`, `ai_draft`, session hashes and enquiries are never public. |
-| Abuse / cost | Rate limits on enquiries (3/h), creation (10/h) and analysis (10/h); enquiry honeypot; Zod validation and length limits on every input. |
+| Data exposure | The public endpoint builds an explicit allowlist from the published snapshot. `owner_input`, `ai_draft`, unpublished edits, session hashes and enquiries are never public. |
+| Abuse / cost | Rate limits on enquiries (3/h), creation (10/h), analysis (10/h) and admin login (10/15 min); enquiry honeypot; Zod validation and length limits on every input. Limits are keyed by client IP, so `TRUST_PROXY_HOPS` must match the real proxy setup. |
 | Secrets | Environment variables only; `.env` and deploy scripts are git-ignored. |
-| Resilience | Async errors go to a JSON error handler. The server starts listening before the DB connects, then retries. |
-| Admin fallback | Optional `OWNER_ADMIN_TOKEN`, entered only at `/owner/admin` and never required for normal use. |
+| Resilience | Async errors go to a JSON error handler. The server starts listening before the DB connects, then keeps retrying with backoff. |
+| Admin fallback | Optional `OWNER_ADMIN_TOKEN`, entered only at `/owner/admin` and never required for normal use. Disabled unless the token is at least 32 characters; constant-time comparison. |
+| Testing | `npm test` runs the real routes and models against an in-memory database and a fake Claude endpoint, covering ownership (401/403/404), public data leakage and draft/live separation. |
 
 ---
 
@@ -222,9 +234,10 @@ These are **planned** and do not exist in the code today.
 
 | Item | Notes |
 |---|---|
-| Own custom domain | Owner searches for a domain via GoDaddy and sees real availability and price, buys it in the owner's name, and Bizdwaar connects it to the storefront. Fees would be disclosed; no partnership or commission is assumed. |
-| Premium custom website | Paid design, extra pages and galleries, hosting and maintenance. |
-| Owner accounts | Email or phone sign-in to manage storefronts across devices; claim existing browser-session storefronts. |
-| Owner photo uploads | Replace the category-based illustrative imagery. |
+| Own custom domain | Owner searches for a domain via GoDaddy and sees real availability and price, buys it in the owner's name, and Bizdwaar connects it to the business page. Fees would be disclosed; no partnership or commission is assumed. |
+| Premium website setup | Paid design and customisation, extra pages and galleries, hosting and maintenance. |
+| Owner accounts | Email or phone sign-in to manage business pages across devices; claim existing browser-session pages. |
+| Owner photo uploads | Replace the illustrative imagery and branded tiles with the owner's own product photos (needs durable storage, size/type limits, EXIF stripping). |
+| Saved claim reviews | Persist the "I've reviewed this" ticks and enforce them on the server at publish. |
 | Per-owner notifications | Email or WhatsApp to each owner instead of one fixed `ENQUIRY_TO`, via a transactional email provider. |
 | Shared rate-limit store | Redis or a DB-backed limiter for multi-instance deployments. |

@@ -305,6 +305,11 @@ export default function OwnerReview({ businessId, onPublished }) {
     const value = target.kind === 'profile'
       ? approved.approvedProfile[target.field]
       : approved.approvedCatalogue[target.index]?.[target.field]
+    // A price only counts once it is a valid rupee amount
+    if (target.kind === 'item' && target.field === 'price') {
+      const amount = parsePriceInput(value)
+      return typeof amount === 'number'
+    }
     if (!target.append) return Boolean(value && String(value).trim())
     const prefix = answerPrefix(q)
     const at = (value || '').indexOf(prefix)

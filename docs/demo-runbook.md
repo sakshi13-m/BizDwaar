@@ -4,15 +4,15 @@
 
 | Time | What to show | Talk track |
 |---|---|---|
-| 0:00–0:20 | Homepage: *Before / After* band | Sara makes beautiful things, but her business lives in scattered chats and word of mouth. Bizdwaar gives it a digital home. |
-| 0:20–0:50 | **Create your storefront** → **Fill in a sample business** → **Organise with Bizdwaar** | No sign-up. Sara describes her studio in everyday words; Claude organises it. |
-| 0:50–1:30 | Review screen | "In your words → Organised by Bizdwaar". The dupatta price was left blank, not guessed. Click **Answer** on a question and it jumps to the field. "100% eco-friendly" was flagged and kept out until Sara reviews it. Items start hidden; switch them on and set availability. |
+| 0:00–0:20 | Homepage: hero and *Before / After* band | Sara makes beautiful things, but her business lives in scattered chats and word of mouth. Bizdwaar gives it a digital home — free. |
+| 0:20–0:50 | **Create your business page** → **Fill in a sample business** → **Organise with Bizdwaar** | No sign-up. Sara describes her studio in everyday words; Claude organises it. |
+| 0:50–1:30 | Review screen | "In your words → Organised by Bizdwaar". Prices come through in rupees. The dupatta price was left blank, not guessed — click **Answer**, type 890, and the field shows "Customers will see ₹890". "100% eco-friendly" was flagged and kept out until Sara reviews it. Items start hidden; switch them on and set availability. |
 | 1:30–1:55 | **Preview & publish** | The preview is the real page. Publish → shareable link. |
-| 1:55–2:25 | Open the storefront as a customer → **Ask about this** on a product → send enquiry | Confirmed prices, sizes and availability only. The enquiry carries the product of interest. |
-| 2:25–2:50 | Owner workspace → **View enquiries** → **Mark as replied**; **Edit storefront**, change a price, save, refresh the storefront | It's an ongoing workspace: enquiries are managed and updates go live straight away. |
-| 2:50–3:00 | Close | Free to start. Own domain and premium website are planned upgrades. AI drafts, the owner decides. |
+| 1:55–2:25 | Open the business page as a customer → **Ask about this** on a product → send an enquiry | Confirmed prices (₹), sizes and availability only. Blank prices say "Price on request". The enquiry carries the product of interest. |
+| 2:25–2:50 | Owner workspace → **View enquiries** → **Mark as replied**; then **Edit business page**, change a price, **Save changes** | The status shows "Live · changes not published yet" and the public page is unchanged — nothing goes live until Sara approves it. **Preview & update live** publishes the change. |
+| 2:50–3:00 | Close | Free to start. Own domain and premium website setup are planned upgrades. AI drafts, the owner decides. |
 
-## Demo persona — Sara's Studio (fictional)
+## Demo business — Sara's Studio (fictional)
 
 Everything below is fictional sample data and is labelled as such in the product. Don't improvise extra
 factual claims on screen.
@@ -34,8 +34,21 @@ The **"Fill in a sample business"** button on the onboarding screen loads exactl
 
 ## Pre-demo checklist
 
-- [ ] Open https://bizdwaar.in in a fresh browser profile (a clean owner session, empty "Welcome back")
+- [ ] `https://bizdwaar.in/api/health` returns 200 and the homepage loads with images (hard refresh after a deploy)
+- [ ] **The example link works:** `https://bizdwaar.in/s/saras-studio` must show a published Sara's Studio.
+      The homepage mentions this address, so publish Sara's Studio once from the browser you will present with
+      (that browser then owns it and can show its inbox). If the published link ends in a number
+      (`saras-studio-…`), an older draft already holds the plain address — sort that out before the demo.
+- [ ] Send one test enquiry to it so the inbox isn't empty
+- [ ] For the live "create" part, either use a second browser profile (fresh owner session) or show the
+      already-published page and walk through **Edit business page** instead
 - [ ] A second browser or incognito window ready for the customer view
-- [ ] Check `/api/health` is 200 and the homepage loads with images
 - [ ] Remember the enquiry email depends on SMTP — show the **inbox** as the source of truth
-- [ ] Afterwards, demo storefronts stay in the database. Note their slugs if you want them removed.
+- [ ] Each "Organise" run calls Claude and creation is limited to 10 per hour per network — rehearse sparingly
+      on the venue network
+- [ ] Afterwards, demo pages stay in the database. Note their slugs if you want them removed.
+
+## Local fallback (no internet / no MySQL)
+
+`npm run build && node server/test/helpers/localServer.js` runs the full app at http://127.0.0.1:3100 with an
+in-memory database and a canned Claude response, seeded with a published Sara's Studio. Nothing is saved.
