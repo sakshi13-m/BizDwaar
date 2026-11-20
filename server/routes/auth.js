@@ -168,18 +168,5 @@ router.get('/admin/businesses', requireAdmin, wrap(async (req, res) => {
   })
 }))
 
-// TEMPORARY (remove after verifying TRUST_PROXY_HOPS): what the server sees for this request's address chain.
-// Admin-only, nothing is logged or stored.
-router.get('/admin/ipcheck', requireAdmin, (req, res) => {
-  res.json({
-    ok: true,
-    trustProxy: req.app.get('trust proxy'),
-    ip: req.ip,
-    ips: req.ips,
-    xForwardedFor: req.headers['x-forwarded-for'] || null,
-    remoteAddress: req.socket.remoteAddress
-  })
-})
-
 export { normaliseEmail }
 export default router
