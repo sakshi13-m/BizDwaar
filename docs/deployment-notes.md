@@ -54,6 +54,7 @@ TRUST_PROXY_HOPS=     (verify actual proxy hop count — see below)
 DB_HOST= DB_PORT= DB_NAME= DB_USER= DB_PASSWORD=   (injected automatically by GoDaddy MySQL)
 ANTHROPIC_API_KEY=
 CLAUDE_MODEL=
+AI_DAILY_LIMIT=       (optional, default 150 Claude calls per day across all users)
 OWNER_ADMIN_TOKEN=    (optional; at least 32 random characters or the admin fallback stays disabled)
 RESEND_API_KEY=       (required for owner login and enquiry emails — GoDaddy blocks SMTP)
 EMAIL_FROM=           (e.g. Bizdwaar <login@bizdwaar.in>; domain verified in Resend)
@@ -63,6 +64,11 @@ ENQUIRY_TO=           (fallback recipient for pages without an owner account)
 At startup the server logs a warning (never the value) if `OWNER_ADMIN_TOKEN` is set but too short.
 
 ## Proxy verification (rate limiting)
+
+Verified 20 Nov 2026: GoDaddy's proxy appends the client address as the last `X-Forwarded-For` entry and the app
+sees `127.0.0.1` as the socket, so **`TRUST_PROXY_HOPS=1`** (set in both PREVIEW and PUBLISH). With 0, every
+visitor appeared as `127.0.0.1` and shared one rate limit.
+
 
 Rate limits are keyed by `req.ip`. If `TRUST_PROXY_HOPS` is 0 behind GoDaddy's proxy, `req.ip` is the proxy's
 address and **every visitor shares one limit** (for enquiries, 3 per hour). Verify the real hop count by

@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
-import { analyseBusinessInput } from '../services/claudeService.js'
+import { analyseBusinessInput, AiDailyLimitError } from '../services/claudeService.js'
 import { requireOwner } from '../middleware/ownerAuth.js'
 
 const router = Router()
@@ -39,6 +39,12 @@ router.post('/analyse', requireOwner, analyseLimiter, async (req, res) => {
     const draft = await analyseBusinessInput(result.data)
     return res.json({ ok: true, draft })
   } catch (err) {
+    if (err instanceof AiDailyLimitError) {
+      return res.status(503).json({
+        error: 'ai_daily_limit',
+        message: "The AI organiser has reached today's limit. You can still fill in your details yourself."
+      })
+    }
     console.error('Claude analysis error:', err.message)
     return res.status(502).json({
       error: 'analysis_failed',

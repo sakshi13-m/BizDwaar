@@ -157,6 +157,7 @@ router.post('/businesses', requireOwner, createLimiter, wrap(async (req, res) =>
       analysedAt:        new Date()
     }
   } catch (err) {
+    // Includes the daily AI cap: the page is still created and the owner fills in details themselves
     console.error('Claude analysis failed during business creation:', err.message)
     // Preserve owner input — do not block creation
     aiDraft = { missingQuestions: [], catalogueDrafts: [], analysedAt: null }

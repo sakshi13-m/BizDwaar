@@ -25,3 +25,16 @@ test('rejects non-JSON and schema violations', () => {
   assert.throws(() => parseClaudeResponse(JSON.stringify({ catalogueDrafts: 'nope' })))
   assert.throws(() => parseClaudeResponse(''), /empty/)
 })
+
+test('daily AI cap: calls beyond AI_DAILY_LIMIT are refused before reaching Claude', async () => {
+  const { analyseBusinessInput, AiDailyLimitError, resetAiUsageForTests } = await import('../services/claudeService.js')
+  const saved = process.env.AI_DAILY_LIMIT
+  process.env.AI_DAILY_LIMIT = '0'
+  resetAiUsageForTests()
+  try {
+    await assert.rejects(() => analyseBusinessInput({ businessName: 'X', description: 'Candles from home' }), AiDailyLimitError)
+  } finally {
+    if (saved === undefined) delete process.env.AI_DAILY_LIMIT; else process.env.AI_DAILY_LIMIT = saved
+    resetAiUsageForTests()
+  }
+})

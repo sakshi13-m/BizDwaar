@@ -76,9 +76,39 @@ REQUIRED JSON SCHEMA:
 }`
 }
 
+// --- Spend guard ---
+// Global cap on Claude calls per UTC day across all users, so abuse from many networks
+// can't drain the API credit. Per-IP rate limits sit in front of this. Set AI_DAILY_LIMIT
+// to change it (0 disables AI entirely; owners then fill in details themselves).
+let usageDay = null
+let usageCount = 0
+
+export class AiDailyLimitError extends Error {
+  constructor() {
+    super('Daily AI limit reached')
+    this.code = 'ai_daily_limit'
+  }
+}
+
+function dailyLimit() {
+  const n = Number(process.env.AI_DAILY_LIMIT ?? 150)
+  return Number.isFinite(n) && n >= 0 ? n : 150
+}
+
+function reserveAiCall() {
+  const today = new Date().toISOString().slice(0, 10)
+  if (usageDay !== today) { usageDay = today; usageCount = 0 }
+  if (usageCount >= dailyLimit()) throw new AiDailyLimitError()
+  usageCount++
+}
+
+// Tests only
+export function resetAiUsageForTests() { usageDay = null; usageCount = 0 }
+
 // --- Main export ---
 
 export async function analyseBusinessInput(input) {
+  reserveAiCall()
   const prompt = buildPrompt(input)
 
   const message = await client.messages.create({

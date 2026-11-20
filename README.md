@@ -227,6 +227,7 @@ Sara's Studio at `/s/saras-studio`. Nothing is saved and no API credits are used
 |---|---|
 | `ANTHROPIC_API_KEY` | Anthropic API key (server only) |
 | `CLAUDE_MODEL` | Claude model ID (default `claude-opus-4-5`) |
+| `AI_DAILY_LIMIT` | Max Claude calls per UTC day across all users (default 150; `0` turns AI off). Spend guard on top of per-IP limits; counts per running instance and resets on restart |
 | `DB_HOST` `DB_PORT` `DB_NAME` `DB_USER` `DB_PASSWORD` | MySQL connection (injected automatically on GoDaddy) |
 | `OWNER_ADMIN_TOKEN` | Optional admin fallback for `/owner/admin` (can manage any page). Must be **at least 32 random characters**, otherwise the fallback stays disabled. |
 | `RESEND_API_KEY` | Resend API key — sends login codes and enquiry notifications over HTTPS (required for login in production) |
@@ -284,7 +285,8 @@ routes return a JSON **404**; malformed request bodies return **400**.
 - **Admin fallback:** disabled unless `OWNER_ADMIN_TOKEN` is at least 32 characters; login attempts are rate
   limited.
 - **Abuse and cost controls:** rate limits on enquiries (3/h), business creation (10/h), analysis (10/h) and
-  admin login; honeypot field; Zod validation and length limits; Claude output schema-validated before use.
+  admin login, keyed by the real client address (`TRUST_PROXY_HOPS=1` on GoDaddy, verified); a global daily cap
+  on Claude calls (`AI_DAILY_LIMIT`); honeypot field; Zod validation and length limits; Claude output schema-validated before use.
 - **Errors:** API errors return JSON and never crash the process; the server keeps retrying the database if it
   is unavailable at startup.
 - Customer enquiries are never public: they are visible in the owning business's inbox (and to the optional
