@@ -356,7 +356,9 @@ export default function LandingPage() {
           <div>
             <p className="eyebrow eyebrow--teal">Why it matters</p>
             <h2 className="h-section">Make your business easier to discover.</h2>
-            <SmartImage src="/images/maker-hand-dipped.jpg" alt="Hand-dipped candles drying on a wooden rack in a maker's studio" className="impact__img" initial="B" />
+            <p className="section-lede">
+              Everything a customer needs to find you, trust you and get in touch — in one link you can share anywhere.
+            </p>
           </div>
           <ul className="benefits">
             <li>
