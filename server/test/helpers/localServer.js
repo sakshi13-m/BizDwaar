@@ -50,11 +50,15 @@ const app = createApp()
 await new Promise(r => app.listen(port, '127.0.0.1', r))
 const base = `http://127.0.0.1:${port}`
 
-// Seed: create, approve and publish Sara's Studio through the real API
+// Seed: create, approve and publish Sara's Studio through the real API.
+// LOCAL_SEED=0 starts empty (e.g. to record a walkthrough that creates Sara's Studio itself).
+let cookie = null
+let created = { slug: 'saras-studio' }
+if (process.env.LOCAL_SEED !== '0') {
 const s = await fetch(`${base}/api/owner/session`, { method: 'POST' })
-const cookie = s.headers.getSetCookie()[0].split(';')[0]
+cookie = s.headers.getSetCookie()[0].split(';')[0]
 const json = { 'content-type': 'application/json', cookie }
-const created = await (await fetch(`${base}/api/owner/businesses`, {
+created = await (await fetch(`${base}/api/owner/businesses`, {
   method: 'POST', headers: json,
   body: JSON.stringify({ businessName: "Sara's Studio", businessType: 'Handmade crafts', location: 'Jaipur, Rajasthan', description: 'I make hand-poured candles, terracotta planters and block-print dupattas at home.' })
 })).json()
@@ -75,6 +79,7 @@ await fetch(`${base}/api/enquiries`, {
   method: 'POST', headers: { 'content-type': 'application/json' },
   body: JSON.stringify({ businessSlug: created.slug, customerName: 'Asha', customerEmail: 'asha@example.com', message: 'Can I order 10 jar candles as wedding favours?', productName: 'Hand-poured Jar Candle' })
 })
+}
 
 // Emails (login codes, enquiry notifications) are printed here instead of being sent.
 // Switched on after seeding so the seed can publish without an owner email.
@@ -85,4 +90,4 @@ setEmailTransportForTests(async (msg) => console.log(`
 console.log(`Local preview: ${base}  ·  storefront ${base}/s/${created.slug}`)
 console.log(`Admin (local only): open ${base}/owner/admin with token ${process.env.OWNER_ADMIN_TOKEN}`)
 console.log('Login codes are printed below when requested.')
-console.log(`Seeded owner cookie (local only): ${cookie}`)
+if (cookie) console.log(`Seeded owner cookie (local only): ${cookie}`)
