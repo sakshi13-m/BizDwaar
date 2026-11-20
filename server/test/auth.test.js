@@ -230,3 +230,9 @@ test('admin list: only with the admin token; shows every page with owner email a
   assert.ok(r.json.businesses.length >= 2)
   assert.ok(!r.text.includes('owner_session_hash') && !r.text.includes('ownerSessionHash'))
 })
+
+test('/me reports whether email login is available', async () => {
+  const r = await call('GET', '/api/owner/me')
+  assert.equal(r.json.emailLogin, true)
+  assert.equal(r.json.loggedIn, false)
+})

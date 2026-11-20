@@ -32,8 +32,11 @@ export function setEmailTransportForTests(fn) {
   testTransport = fn
 }
 
+// Whether owner login codes can be delivered. In production only the HTTPS API counts,
+// because GoDaddy blocks outbound SMTP; SMTP is accepted for local development.
 export function emailConfigured() {
-  return Boolean(testTransport || process.env.RESEND_API_KEY || process.env.SMTP_HOST)
+  if (testTransport || process.env.RESEND_API_KEY) return true
+  return Boolean(process.env.SMTP_HOST) && process.env.NODE_ENV !== 'production'
 }
 
 function fromAddress() {

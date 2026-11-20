@@ -5,7 +5,7 @@ import { randomBytes, randomInt, createHash, timingSafeEqual } from 'crypto'
 import Owner, { OwnerSession, LoginCode, normaliseEmail } from '../models/Owner.js'
 import Business from '../models/Business.js'
 import Enquiry from '../models/Enquiry.js'
-import { sendLoginCodeEmail } from '../services/emailService.js'
+import { sendLoginCodeEmail, emailConfigured } from '../services/emailService.js'
 import {
   loadOwner,
   requireAdmin,
@@ -139,7 +139,8 @@ router.post('/login/verify', verifyLimiter, wrap(async (req, res) => {
 // ---------------------------------------------------------------
 router.get('/me', loadOwner, wrap(async (req, res) => {
   const owner = await Owner.findById(req.ownerId)
-  return res.json({ ok: true, loggedIn: Boolean(owner), email: owner?.email || null, isAdmin: req.isAdmin })
+  // emailLogin=false hides the login buttons until an email provider is configured
+  return res.json({ ok: true, loggedIn: Boolean(owner), email: owner?.email || null, isAdmin: req.isAdmin, emailLogin: emailConfigured() })
 }))
 
 // ---------------------------------------------------------------

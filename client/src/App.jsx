@@ -119,6 +119,8 @@ function MyStorefronts({ businesses, onOpen, loggedIn, onSignIn }) {
       </div>
       {loggedIn ? (
         <p className="my-stores__note">Saved to your account — log in with the same email to manage them from any device.</p>
+      ) : !onSignIn ? (
+        <p className="my-stores__note">These are saved in this browser.</p>
       ) : (
         <p className="my-stores__note">
           These are saved in this browser only.{' '}
@@ -164,11 +166,11 @@ function OwnerFlow() {
   const [session, setSession] = useState('starting') // 'starting' | 'ready' | 'error'
   const [sessionError, setSessionError] = useState('')
   const [myBusinesses, setMyBusinesses] = useState([])
-  const [me, setMe] = useState({ loggedIn: false, email: null, isAdmin: false })
+  const [me, setMe] = useState({ loggedIn: false, email: null, isAdmin: false, emailLogin: false })
 
   async function refreshOwner() {
     const [who, list] = await Promise.all([getMe(), listMyBusinesses()])
-    if (who.ok) setMe({ loggedIn: who.loggedIn, email: who.email, isAdmin: who.isAdmin })
+    if (who.ok) setMe({ loggedIn: who.loggedIn, email: who.email, isAdmin: who.isAdmin, emailLogin: Boolean(who.emailLogin) })
     setMyBusinesses(list.ok ? (list.businesses || []) : [])
     return who
   }
@@ -182,6 +184,8 @@ function OwnerFlow() {
       const who = await refreshOwner()
       // Returning admin (cookie still valid) skips the token screen
       if (isAdminPath && who.isAdmin) { setAdminMode(true); setStep('admin') }
+      // Login link opened but email login isn't available on this server
+      if (wantsSignIn && !who.emailLogin) setStep(s => (s === 'signin' ? 'onboarding' : s))
       setSession('ready')
     } catch (err) {
       setSessionError(err.message || 'Network error — could not start your session.')
@@ -231,7 +235,7 @@ function OwnerFlow() {
     if (!window.confirm(msg)) return
     await logout().catch(() => {})
     setAdminMode(false)
-    setMe({ loggedIn: false, email: null, isAdmin: false })
+    setMe(m => ({ ...m, loggedIn: false, email: null, isAdmin: false }))
     setBusinessId(null)
     setPublishedSlug(null)
     setPublishedBusinessId(null)
@@ -264,7 +268,7 @@ function OwnerFlow() {
   const account = {
     email: me.loggedIn ? me.email : null,
     isAdminMode: adminMode,
-    onSignIn: goSignIn,
+    onSignIn: me.emailLogin ? goSignIn : null,
     onLogout: handleLogout
   }
 
@@ -314,13 +318,13 @@ function OwnerFlow() {
         )}
         {session === 'ready' && (
           <>
-            {!me.loggedIn && myBusinesses.length === 0 && (
+            {me.emailLogin && !me.loggedIn && myBusinesses.length === 0 && (
               <p className="returning-note">
                 Already have a business page?{' '}
                 <button type="button" className="btn btn--text btn--inline" onClick={goSignIn}>Log in with your email</button>
               </p>
             )}
-            <MyStorefronts businesses={myBusinesses} onOpen={openExisting} loggedIn={me.loggedIn} onSignIn={goSignIn} />
+            <MyStorefronts businesses={myBusinesses} onOpen={openExisting} loggedIn={me.loggedIn} onSignIn={me.emailLogin ? goSignIn : null} />
             <Onboarding
               onCreated={(id) => {
                 setBusinessId(id)
@@ -387,7 +391,7 @@ function OwnerFlow() {
               </button>
             </div>
 
-            {!me.loggedIn && <KeepAccessCard name={publishedName} onSignIn={goSignIn} />}
+            {me.emailLogin && !me.loggedIn && <KeepAccessCard name={publishedName} onSignIn={goSignIn} />}
 
             <div className="published__actions">
               <a href={url} target="_blank" rel="noreferrer" className="btn btn--primary">View my business page</a>

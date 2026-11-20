@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Logo, LogoMark } from '../components/Brand'
 import SmartImage from '../components/SmartImage'
 import StorefrontView from '../components/StorefrontView'
@@ -44,6 +45,15 @@ const CATEGORIES = [
 ]
 
 export default function LandingPage() {
+  // Show "Log in" only when email login is available on this server
+  const [emailLogin, setEmailLogin] = useState(false)
+  useEffect(() => {
+    fetch('/api/owner/me', { credentials: 'include' })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setEmailLogin(Boolean(d?.emailLogin)))
+      .catch(() => {})
+  }, [])
+
   return (
     <div className="landing">
       {/* ---------- Nav ---------- */}
@@ -56,7 +66,9 @@ export default function LandingPage() {
           <button type="button" onClick={() => scrollToId('plans')}>What's free</button>
         </div>
         <div className="site-nav__cta">
-          <button type="button" className="btn btn--text" onClick={() => navigate('/owner?login=1')}>Log in</button>
+          {emailLogin && (
+            <button type="button" className="btn btn--text" onClick={() => navigate('/owner?login=1')}>Log in</button>
+          )}
           <button type="button" className="btn btn--primary btn--sm" onClick={() => navigate('/owner')}>
             Create your business page
           </button>
