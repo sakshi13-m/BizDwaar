@@ -4,33 +4,38 @@
 
 | Time | What to show | Talk track |
 |---|---|---|
-| 0:00–0:20 | Problem and persona | A small seller has products but no simple professional digital home. Introduce the Indore pickle seller. |
-| 0:20–0:50 | Onboarding + Claude | Enter the business description. Show Claude organising the information into a profile and product draft. |
-| 0:50–1:25 | Missing facts + owner review | Point to price/size/ingredients/shelf-life questions. Show unknown fields blank and owner editing/confirming only prepared facts. |
-| 1:25–2:05 | Preview + publish | Owner reviews the page and explicitly publishes it. Open the live Bizdwaar storefront on the custom domain. |
-| 2:05–2:40 | Customer enquiry + email | Open the page as a customer, submit an enquiry, then show the real received email in the owner mailbox. |
-| 2:40–3:00 | Impact close | Summarise: unstructured information became an owner-approved catalogue, shareable storefront and working enquiry channel. |
+| 0:00–0:20 | Homepage: *Before / After* band | Sara makes beautiful things, but her business lives in scattered chats and word of mouth. Bizdwaar gives it a digital home. |
+| 0:20–0:50 | **Create your storefront** → **Fill in a sample business** → **Organise with Bizdwaar** | No sign-up. Sara describes her studio in everyday words; Claude organises it. |
+| 0:50–1:30 | Review screen | "In your words → Organised by Bizdwaar". The dupatta price was left blank, not guessed. Click **Answer** on a question and it jumps to the field. "100% eco-friendly" was flagged and kept out until Sara reviews it. Items start hidden; switch them on and set availability. |
+| 1:30–1:55 | **Preview & publish** | The preview is the real page. Publish → shareable link. |
+| 1:55–2:25 | Open the storefront as a customer → **Ask about this** on a product → send enquiry | Confirmed prices, sizes and availability only. The enquiry carries the product of interest. |
+| 2:25–2:50 | Owner workspace → **View enquiries** → **Mark as replied**; **Edit storefront**, change a price, save, refresh the storefront | It's an ongoing workspace: enquiries are managed and updates go live straight away. |
+| 2:50–3:00 | Close | Free to start. Own domain and premium website are planned upgrades. AI drafts, the owner decides. |
 
-## Demo persona — fictional pickle seller in Indore
+## Demo persona — Sara's Studio (fictional)
 
-Prepare all facts in advance. Do not improvise factual product claims on screen.
+Everything below is fictional sample data and is labelled as such in the product. Don't improvise extra
+factual claims on screen.
 
-**Sample facts to pre-load (fictional demo data only):**
-- Business name: Priya's Pickles
-- Location: Indore, Madhya Pradesh
-- Description: "I make traditional Indori pickles at home using my grandmother's recipes. Currently offering mango and mixed vegetable pickles."
-- Products to enter: Mango Pickle, Mixed Vegetable Pickle
-- Facts to intentionally omit in first pass: price, jar size, ingredients list, shelf life — to demonstrate Claude's missing-fact questions
+- **Business name:** Sara's Studio
+- **Type:** Handmade crafts and home décor
+- **Location:** Jaipur, Rajasthan
+- **Description:** "I run a small studio from home where I make hand-poured candles, paint terracotta planters
+  and block-print cotton dupattas. I sell to friends, at weekend craft markets and through word of mouth, and
+  customers often order them as gifts. Everything I make is 100% eco-friendly."
+- **Products:**
+  - Hand-poured jar candle — 200g, ₹350
+  - Painted terracotta planter — 6 inch, ₹450
+  - Block-print cotton dupatta *(price and size deliberately omitted → Claude asks)*
+- **Intentional gaps to demonstrate:** dupatta price and size, contact details, availability.
+- **Intentional claim to demonstrate:** "100% eco-friendly" → flagged as unsupported.
+
+The **"Fill in a sample business"** button on the onboarding screen loads exactly these facts.
 
 ## Pre-demo checklist
 
-- [ ] Demo owner details and permitted sample facts ready to paste
-- [ ] Owner mailbox created, signed in to in a separate tab, test message verified
-- [ ] Clean browser window ready for customer view; live URL copied
-- [ ] Product deployed; database contains no confusing test records
-- [ ] One timed rehearsal of the exact three-minute sequence completed
-- [ ] Do not rely on a fresh deploy during the demo
-
-## Demo success condition
-
-The judge sees one continuous, live journey from business description to an owner-approved public page and a real enquiry email. A video or screenshot is a backup only, not a substitute for the live flow.
+- [ ] Open https://bizdwaar.in in a fresh browser profile (a clean owner session, empty "Welcome back")
+- [ ] A second browser or incognito window ready for the customer view
+- [ ] Check `/api/health` is 200 and the homepage loads with images
+- [ ] Remember the enquiry email depends on SMTP — show the **inbox** as the source of truth
+- [ ] Afterwards, demo storefronts stay in the database. Note their slugs if you want them removed.

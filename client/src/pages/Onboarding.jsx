@@ -118,7 +118,7 @@ export default function Onboarding({ onCreated }) {
                 id="businessName"
                 value={form.businessName}
                 onChange={e => update('businessName', e.target.value)}
-                placeholder="e.g. Puja's Candle Studio"
+                placeholder="e.g. Sara's Studio"
                 maxLength={200}
                 required
               />
@@ -131,7 +131,7 @@ export default function Onboarding({ onCreated }) {
                   id="businessType"
                   value={form.businessType}
                   onChange={e => update('businessType', e.target.value)}
-                  placeholder="e.g. Handmade candles, Home food"
+                  placeholder="e.g. Handmade crafts, Home food, Boutique"
                   maxLength={200}
                 />
                 <p className="field__help">Helps us suggest a category.</p>
@@ -142,7 +142,7 @@ export default function Onboarding({ onCreated }) {
                   id="location"
                   value={form.location}
                   onChange={e => update('location', e.target.value)}
-                  placeholder="e.g. Pune, Maharashtra"
+                  placeholder="e.g. Jaipur, Rajasthan"
                   maxLength={200}
                 />
                 <p className="field__help">Local customers search by area.</p>
@@ -174,7 +174,7 @@ export default function Onboarding({ onCreated }) {
                 ref={storyRef}
                 value={form.description}
                 onChange={e => update('description', e.target.value)}
-                placeholder="I make soy wax candles at home in small batches. My customers are mostly families buying gifts for festivals…"
+                placeholder="I make hand-poured candles and block-print dupattas in my home studio. My customers are mostly people buying gifts…"
                 rows={6}
                 minLength={10}
                 maxLength={2000}
@@ -203,7 +203,7 @@ export default function Onboarding({ onCreated }) {
                 id="productsRaw"
                 value={form.productsRaw}
                 onChange={e => update('productsRaw', e.target.value)}
-                placeholder={'Lavender Calm — 200g jar, ₹280\nCitrus Burst — 180g tin, ₹260'}
+                placeholder={'Hand-poured jar candle — 200g, ₹350\nPainted terracotta planter — 6 inch, ₹450'}
                 rows={4}
                 maxLength={2000}
               />

@@ -81,6 +81,14 @@ const Enquiry = {
     return Enquiry.findById(id)
   },
 
+  // Test-cleanup helper: delete one enquiry by exact id
+  async deleteOne({ _id, id } = {}) {
+    const key = _id || id
+    if (!key) return
+    const db = getPool()
+    await db.execute('DELETE FROM enquiries WHERE id = ?', [key])
+  },
+
   async deleteMany({ businessId } = {}) {
     const db = getPool()
     if (businessId) {

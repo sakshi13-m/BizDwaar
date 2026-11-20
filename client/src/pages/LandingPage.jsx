@@ -82,14 +82,14 @@ export default function LandingPage() {
             <LogoMark size={22} />
             <div>
               <span className="float-label">Now live</span>
-              <span className="float-value">bizdwaar.in/s/pujas-candle-studio</span>
+              <span className="float-value">bizdwaar.in/s/saras-studio</span>
             </div>
           </div>
           <div className="hero__float hero__float--enquiry">
             <span className="dot dot--coral" />
             <div>
               <span className="float-label">New enquiry</span>
-              <span className="float-value">"Do you take Diwali gift orders?"</span>
+              <span className="float-value">"Can I order 10 candles as wedding favours?"</span>
             </div>
           </div>
         </div>
@@ -102,10 +102,10 @@ export default function LandingPage() {
             <p className="eyebrow">Before</p>
             <h3>Word of mouth and scattered messages</h3>
             <div className="chat">
-              <p className="chat__bubble">Hi! Price of the lavender candle?</p>
-              <p className="chat__bubble chat__bubble--me">₹280 for 200g 🙂</p>
-              <p className="chat__bubble">Can you send photos of all of them again?</p>
-              <p className="chat__bubble">Do you deliver to Kothrud??</p>
+              <p className="chat__bubble">Hi! Price of the jar candle?</p>
+              <p className="chat__bubble chat__bubble--me">₹350 for 200g 🙂</p>
+              <p className="chat__bubble">Can you send photos of the dupattas again?</p>
+              <p className="chat__bubble">Do you deliver to Malviya Nagar??</p>
             </div>
             <p className="transform__caption">Answering the same questions, one chat at a time.</p>
           </div>
@@ -117,23 +117,23 @@ export default function LandingPage() {
             <h3>One link with everything customers need</h3>
             <div className="mini-store">
               <div className="mini-store__head">
-                <span className="sf-monogram">P</span>
+                <span className="sf-monogram">S</span>
                 <div>
-                  <strong>Puja's Candle Studio</strong>
-                  <span>Handmade candles · Pune</span>
+                  <strong>Sara's Studio</strong>
+                  <span>Handmade crafts · Jaipur</span>
                 </div>
               </div>
               <ul className="mini-store__list">
-                <li><span>Lavender Calm</span><span className="price-chip">₹280</span></li>
-                <li><span>Citrus Burst</span><span className="price-chip">₹260</span></li>
-                <li><span>Sandalwood &amp; Rose</span><span className="price-chip">₹320</span></li>
+                <li><span>Hand-poured Jar Candle</span><span className="price-chip">₹350</span></li>
+                <li><span>Painted Terracotta Planter</span><span className="price-chip">₹450</span></li>
+                <li><span>Block-print Cotton Dupatta</span><span className="price-chip">₹890</span></li>
               </ul>
               <span className="mini-store__cta">Send an enquiry</span>
             </div>
             <p className="transform__caption">Organised, shareable, and ready for new customers.</p>
           </div>
         </div>
-        <p className="fiction-note">Puja's Candle Studio is a fictional demo business.</p>
+        <p className="fiction-note">Sara's Studio is a fictional demo business.</p>
       </section>
 
       {/* ---------- Section 1: stories ---------- */}
@@ -177,7 +177,7 @@ export default function LandingPage() {
                 <p>Describe what you make and sell in your own words — the way you'd tell a friend. No forms full of jargon.</p>
               </div>
               <div className="step__visual step__visual--quote">
-                <p>"I make soy wax candles at home in small batches… Lavender Calm — 200g jar, ₹280…"</p>
+                <p>"I make hand-poured candles, paint terracotta planters and block-print dupattas at home… Jar candle — 200g, ₹350…"</p>
               </div>
             </li>
             <li className="step step--alt">
@@ -187,9 +187,9 @@ export default function LandingPage() {
                 <p>Bizdwaar turns your description into a clear profile and product catalogue — and points out anything that's missing.</p>
               </div>
               <div className="step__visual step__visual--fields">
-                <div className="field-row"><span>Product</span><strong>Lavender Calm</strong></div>
-                <div className="field-row"><span>Price</span><strong>₹280</strong></div>
-                <div className="field-row field-row--missing"><span>Price</span><strong>Sandalwood &amp; Rose — needs your input</strong></div>
+                <div className="field-row"><span>Product</span><strong>Hand-poured Jar Candle</strong></div>
+                <div className="field-row"><span>Price</span><strong>₹350</strong></div>
+                <div className="field-row field-row--missing"><span>Price</span><strong>Cotton Dupatta — needs your input</strong></div>
               </div>
             </li>
             <li className="step">
@@ -199,8 +199,8 @@ export default function LandingPage() {
                 <p>Edit anything, choose what customers see, preview the real page, then publish a link you can share anywhere.</p>
               </div>
               <div className="step__visual step__visual--publish">
-                <div className="toggle-row"><span className="switch is-on" /> Lavender Calm — visible</div>
-                <div className="toggle-row"><span className="switch is-on" /> Citrus Burst — visible</div>
+                <div className="toggle-row"><span className="switch is-on" /> Jar Candle — visible</div>
+                <div className="toggle-row"><span className="switch is-on" /> Terracotta Planter — visible</div>
                 <span className="publish-pill"><LogoMark size={16} /> Published</span>
               </div>
             </li>
@@ -233,22 +233,22 @@ export default function LandingPage() {
                 <span className="badge badge--ai">AI-organised draft</span>
                 <span className="ai-card__from">from your description</span>
               </div>
-              <h4>Puja's Candle Studio</h4>
-              <p>Hand-poured soy wax candles made in small batches in Pune, popular as gifts.</p>
+              <h4>Sara's Studio</h4>
+              <p>Hand-poured candles, painted terracotta and block-printed dupattas from a home studio in Jaipur.</p>
               <div className="ai-card__items">
-                <div><span>Lavender Calm</span><span>200g jar · ₹280</span></div>
-                <div><span>Citrus Burst</span><span>180g tin · ₹260</span></div>
-                <div><span>Sandalwood &amp; Rose</span><span className="is-missing">220g jar · price?</span></div>
+                <div><span>Hand-poured Jar Candle</span><span>200g · ₹350</span></div>
+                <div><span>Painted Terracotta Planter</span><span>6 inch · ₹450</span></div>
+                <div><span>Block-print Cotton Dupatta</span><span className="is-missing">size? · price?</span></div>
               </div>
             </div>
             <div className="missing-card">
               <span className="badge badge--missing">Missing information</span>
-              <p><strong>What is the price of Sandalwood &amp; Rose?</strong></p>
+              <p><strong>What is the price of the block-print cotton dupatta?</strong></p>
               <p className="missing-card__sub">We left it blank instead of guessing.</p>
             </div>
             <div className="claim-card">
               <span className="badge badge--claim">Please confirm</span>
-              <p>"The best candles in Pune"</p>
+              <p>"Everything I make is 100% eco-friendly"</p>
               <p className="missing-card__sub">Kept out of your summary until you check it.</p>
             </div>
           </div>
@@ -282,7 +282,7 @@ export default function LandingPage() {
           <div>
             <p className="eyebrow eyebrow--teal">Why it matters</p>
             <h2 className="h-section">Make your business easier to discover.</h2>
-            <SmartImage src="/images/maker-hand-dipped.jpg" alt="Hand-dipped candles drying on a wooden rack" className="impact__img" initial="B" />
+            <SmartImage src="/images/maker-hand-dipped.jpg" alt="Hand-dipped candles drying on a wooden rack in a maker's studio" className="impact__img" initial="B" />
           </div>
           <ul className="benefits">
             <li>

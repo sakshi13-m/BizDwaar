@@ -1,6 +1,7 @@
 # Bizdwaar
 
-**AI-powered digital launch companion for micro-businesses | GoDaddy Inclusive Innovation Hackathon 2026**
+**Your business's digital home — an AI-assisted storefront and enquiry workspace for India's micro-businesses.**
+*GoDaddy Inclusive Innovation Hackathon 2026*
 
 > *Your business's doorway to the digital world.*
 
@@ -11,27 +12,74 @@
 | Environment | URL |
 |---|---|
 | Production | https://bizdwaar.in |
-| Direct | https://t3xjlpgdqh.c36.airoapp.ai |
+| Direct (GoDaddy) | https://t3xjlpgdqh.c36.airoapp.ai |
 
-Owner access: use the token configured in your GoDaddy hosting secrets.
+No sign-up or access token is needed — open the site and click **Create your storefront**.
+On the first screen, **"Fill in a sample business"** loads the fictional demo persona, *Sara's Studio*.
+
+Architecture, data model, API and security design: **[docs/architecture.md](docs/architecture.md)**.
 
 ---
 
 ## What it does
 
-Bizdwaar lets a micro-business owner describe their business in plain language. Claude structures that description into a reviewed catalogue, the owner approves only what is accurate, and the result is a mobile-friendly public storefront with a working customer enquiry form.
+A home-based maker, boutique or small service provider describes their business in everyday language.
+Claude organises that description into a draft profile and catalogue, **points out what's missing instead of
+guessing**, and flags claims it can't verify. The owner reviews, fills the gaps, chooses what customers see and
+publishes a mobile-friendly storefront with a working enquiry channel. They can come back any time to update it
+and manage enquiries.
 
-**The core principle**: Claude organises owner-provided facts. It never invents missing information — prices, sizes, ingredients, and certifications are always left as explicit questions for the owner to answer.
+**Core principle:** AI drafts, the owner decides. Prices, sizes, ingredients, certifications, availability and
+delivery promises are never invented — they stay blank until the owner provides them, and nothing is public until
+the owner approves it.
 
-**Demo flow:**
-1. Owner visits `/owner` and logs in with their token
-2. Describes their business in plain language
-3. Claude drafts a structured profile and product catalogue
-4. Missing facts (price, size, ingredients) surface as explicit questions — never guessed
-5. Owner reviews, edits and approves only what is true
-6. Owner publishes — a shareable storefront at `/s/:slug` goes live instantly
-7. Customer submits an enquiry via the storefront
-8. Enquiry is saved and owner receives an email notification
+### Owner journey
+
+1. **Describe** — visit `/owner`. An anonymous owner session starts automatically (no login form).
+2. **AI draft** — Claude returns a structured profile, catalogue items, *missing-information questions* and
+   *unsupported claims*.
+3. **Review** — side-by-side "In your words → Organised by Bizdwaar"; every field shows whether it is an AI
+   suggestion or confirmed by the owner. Each question has an **Answer** button that jumps to the right field and
+   ticks off when answered. Products can be added, edited or removed.
+4. **Approve** — items start *hidden*; the owner switches on what customers may see and sets availability.
+   Flagged claims must be reviewed before publishing.
+5. **Preview & publish** — the preview is the real storefront page; publishing creates `/s/:slug`.
+6. **Manage** — enquiries arrive in the owner inbox (status: new / replied / closed). Returning owners see
+   "Welcome back" with their storefronts and can edit them; saved changes appear publicly straight away.
+
+### Customer journey
+
+Open `/s/:slug` → browse offerings (confirmed prices, sizes, availability) → **Ask about this** on a product or
+**Send an enquiry** → the enquiry is stored and appears in the owner's inbox with the product of interest.
+
+---
+
+## Features — implemented vs planned
+
+| Capability | Status |
+|---|---|
+| AI-assisted profile + catalogue (Claude, schema-validated) | ✅ Implemented |
+| Missing-information questions with in-place answering | ✅ Implemented |
+| Unsupported-claim flagging, review required before publish | ✅ Implemented |
+| Owner review, add/edit/remove items, per-item visibility | ✅ Implemented |
+| Item availability (available / made to order / out of stock) | ✅ Implemented |
+| Real-page preview and publish | ✅ Implemented |
+| Public storefront (owner-approved fields only) | ✅ Implemented |
+| Customer enquiries with product of interest | ✅ Implemented |
+| Owner inbox with status filters | ✅ Implemented |
+| Returning owners update their storefront (same browser) | ✅ Implemented |
+| Email notification of enquiries | ⚠️ Partial — sent to one configured address (`ENQUIRY_TO`) and depends on outbound SMTP, which GoDaddy hosting may block. The inbox is the reliable channel. |
+| Owner accounts across devices (login) | ❌ Not built — storefronts are managed from the browser they were created in |
+| **Own custom domain** (search, buy via GoDaddy, connect) | 🗺️ Planned, not built |
+| **Premium custom website service** | 🗺️ Planned, not built |
+| Payments, orders, inventory, analytics | ❌ Out of scope |
+
+### Business model (planned)
+
+- **Free storefront** on `bizdwaar.in/s/your-business` — everything marked ✅ above.
+- **Own domain** (planned) — an optional paid upgrade. The domain belongs to the owner; registration and renewal
+  fees would be shown from GoDaddy at purchase time. Nothing is integrated yet and no prices are assumed.
+- **Premium website** (planned) — a paid customised site, hosting and maintenance service.
 
 ---
 
@@ -39,13 +87,13 @@ Bizdwaar lets a micro-business owner describe their business in plain language. 
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18 + Vite 5 |
+| Frontend | React 18 + Vite 5 (no UI framework; custom CSS design system) |
 | Backend | Node.js 22 + Express 4 |
-| AI | Anthropic Claude (`claude-opus-4-5`) |
-| Database | MySQL (GoDaddy hosted, auto-provisioned) |
-| Email | Nodemailer + GoDaddy Professional Email SMTP |
-| Hosting | GoDaddy Platform (Node.js hosting) |
-| Domain | bizdwaar.in (GoDaddy, HTTPS via edge TLS) |
+| AI | Anthropic Claude via `@anthropic-ai/sdk` (model set by `CLAUDE_MODEL`, default `claude-opus-4-5`) |
+| Validation | Zod (request bodies and Claude output) |
+| Database | MySQL (GoDaddy hosted) via `mysql2` |
+| Email | Nodemailer (SMTP) |
+| Hosting | GoDaddy Node.js hosting, domain `bizdwaar.in` (HTTPS at the edge) |
 
 ---
 
@@ -53,35 +101,34 @@ Bizdwaar lets a micro-business owner describe their business in plain language. 
 
 ```
 bizdwaar/
-  package.json          # single root package — GoDaddy ZIP root
-  vite.config.js
-  .env.example          # all required env vars documented; never commit .env
+  package.json            # single root package — GoDaddy ZIP root
+  vite.config.js          # Vite root = client/, output = ./dist
+  .env.example            # all env vars documented; never commit .env
   client/
     index.html
+    public/images/        # CC0 photos (credits in CREDITS.md)
     src/
-      pages/            # OwnerLogin, Onboarding, OwnerReview, PublicStorefront, EnquiryForm
-      api/              # owner.js fetch helpers
-      styles/           # App.css, Storefront.css
+      App.jsx             # router + owner workspace state machine
+      pages/              # LandingPage, Onboarding, OwnerReview, OwnerInbox,
+                          # PublicStorefront, EnquiryForm, OwnerLogin (admin)
+      components/         # StorefrontView (shared by storefront, preview, homepage), Brand, SmartImage
+      lib/                # demoData (Sara's Studio), imagery, navigate
+      api/owner.js        # owner API helpers (credentials: 'include')
+      styles/             # App.css (design system + workspace), Storefront.css
   server/
-    index.js            # Express entry point; starts HTTP then connects DB
-    db.js               # mysql2 pool + auto-create schema on first boot
+    index.js              # Express entry; JSON error handler; serves dist/
+    db.js                 # mysql2 pool, schema creation, additive migrations
+    middleware/ownerAuth.js   # anonymous owner sessions, ownership checks, admin fallback
     routes/
-      ai.js             # POST /api/ai/analyse
-      owner.js          # owner login/logout, business CRUD, publish
-      public.js         # GET /api/businesses/:slug (public, allowlisted fields)
-      enquiry.js        # POST /api/enquiries (rate limit, honeypot, validation)
-    middleware/
-      ownerAuth.js      # requireOwner — signed HttpOnly cookie check
-    models/
-      Business.js       # MySQL query layer for businesses table
-      Enquiry.js        # MySQL query layer for enquiries table
-    services/
-      claudeService.js  # Claude API + Zod schema validation
-      emailService.js   # Nodemailer SMTP
-    scripts/
-      testLive.js       # 19/19 live smoke test against deployed URL
-  dist/                 # built React client (committed for GoDaddy ZIP deploy)
-  docs/
+      owner.js            # session, businesses, publish, enquiries (owner-only)
+      public.js           # GET /api/businesses/:slug (allowlisted fields)
+      enquiry.js          # POST /api/enquiries (rate limit, honeypot, validation)
+      ai.js               # POST /api/ai/analyse (owner session + rate limit)
+    models/               # Business.js, Enquiry.js (MySQL query layer)
+    services/             # claudeService.js (prompt + Zod), emailService.js
+    scripts/              # integration / smoke tests (see Testing)
+  dist/                   # built client (committed for GoDaddy ZIP deploy)
+  docs/                   # architecture.md, demo-runbook.md, deployment-notes.md, product-spec.md
 ```
 
 ---
@@ -89,106 +136,122 @@ bizdwaar/
 ## Local setup
 
 ```bash
-# 1. Clone
 git clone https://github.com/sakshi13-m/BizDwaar.git
 cd BizDwaar
-
-# 2. Install
 npm install
+cp .env.example .env      # fill in ANTHROPIC_API_KEY and DB_* (a local MySQL 8 database)
+npm run dev               # Vite (5173) + Express (3000)
 
-# 3. Configure environment
-cp .env.example .env
-# Fill in ANTHROPIC_API_KEY, DB_* (needs local MySQL), SMTP_*, OWNER_ADMIN_TOKEN, COOKIE_SECRET
-
-# 4. Dev server (runs Vite + Express concurrently)
-npm run dev
-
-# 5. Production build
-npm run build
-npm start
+npm run build && npm start   # production build served by Express
 ```
 
----
+Tables and migrations are created automatically on startup.
 
 ## Environment variables
 
 | Variable | Description |
 |---|---|
-| `ANTHROPIC_API_KEY` | Anthropic API key |
-| `CLAUDE_MODEL` | Model name (default: `claude-opus-4-5`) |
-| `DB_HOST` | MySQL host (auto-injected on GoDaddy) |
-| `DB_PORT` | MySQL port (auto-injected on GoDaddy) |
-| `DB_NAME` | MySQL database (auto-injected on GoDaddy) |
-| `DB_USER` | MySQL user (auto-injected on GoDaddy) |
-| `DB_PASSWORD` | MySQL password (auto-injected on GoDaddy) |
-| `OWNER_ADMIN_TOKEN` | Secret token for owner login |
-| `COOKIE_SECRET` | Secret for signed HttpOnly session cookie |
-| `SMTP_HOST` | SMTP server hostname |
-| `SMTP_PORT` | SMTP port (587 for STARTTLS) |
-| `SMTP_USER` | SMTP username / from address |
-| `SMTP_PASS` | SMTP password |
-| `ENQUIRY_TO` | Email address that receives enquiry notifications |
+| `ANTHROPIC_API_KEY` | Anthropic API key (server only) |
+| `CLAUDE_MODEL` | Claude model ID (default `claude-opus-4-5`) |
+| `DB_HOST` `DB_PORT` `DB_NAME` `DB_USER` `DB_PASSWORD` | MySQL connection (injected automatically on GoDaddy) |
+| `OWNER_ADMIN_TOKEN` | Optional admin fallback token for `/owner/admin` (can manage any storefront) |
+| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` | SMTP for enquiry notifications (587 = STARTTLS) |
+| `ENQUIRY_TO` | Fixed address that receives enquiry notifications |
+| `TRUST_PROXY_HOPS` | Proxy hops to trust for client IPs (rate limiting); 0 locally |
+| `NODE_ENV` | `production` enables `Secure` cookies |
 
-See `.env.example` for a full template. Secrets must never be committed or prefixed with `VITE_`.
+Secrets live only in environment variables — never in code or `VITE_` variables.
 
 ---
 
 ## API reference
 
-| Method | Path | Auth | Description |
+| Method | Path | Who can call | Purpose |
 |---|---|---|---|
-| GET | `/api/health` | — | Server health check |
-| POST | `/api/ai/analyse` | Owner session | Run Claude analysis on business input (rate-limited) |
-| POST | `/api/owner/login` | — | Exchange token for session cookie |
-| POST | `/api/owner/logout` | cookie | Clear session |
-| POST | `/api/owner/businesses` | cookie | Create business + run Claude |
-| GET | `/api/owner/businesses/:id` | cookie | Fetch draft for review |
-| PUT | `/api/owner/businesses/:id` | cookie | Save approved profile + catalogue |
-| POST | `/api/owner/businesses/:id/publish` | cookie | Publish storefront |
-| GET | `/api/businesses/:slug` | — | Public storefront (allowlisted fields only) |
-| POST | `/api/enquiries` | — | Submit customer enquiry |
+| GET | `/api/health` | Anyone | Health check |
+| POST | `/api/owner/session` | Anyone | Start or reuse an anonymous owner session (HttpOnly cookie) |
+| GET | `/api/owner/businesses` | Owner session | List the caller's storefronts |
+| POST | `/api/owner/businesses` | Owner session · 10/h per IP | Create a draft and run Claude analysis |
+| GET | `/api/owner/businesses/:id` | Owner of that business | Load draft + approved data |
+| PUT | `/api/owner/businesses/:id` | Owner of that business | Save approved profile + catalogue |
+| POST | `/api/owner/businesses/:id/publish` | Owner of that business | Publish storefront |
+| GET | `/api/owner/businesses/:id/enquiries` | Owner of that business | List enquiries |
+| PATCH | `/api/owner/businesses/:id/enquiries/:enquiryId` | Owner of that business | Set status `new` / `replied` / `closed` |
+| POST | `/api/owner/login` · `/logout` | Anyone | Optional admin fallback (token) / clear cookies |
+| POST | `/api/ai/analyse` | Owner session · 10/h per IP | Run Claude analysis without saving |
+| GET | `/api/businesses/:slug` | Anyone | Public storefront — allowlisted, approved fields only |
+| POST | `/api/enquiries` | Anyone · 3/h per IP | Submit enquiry (honeypot, validation, optional `productName`) |
+
+Requests for another owner's business return **403**; requests without a session return **401**.
 
 ---
 
-## Security notes
+## Security and privacy
 
-- Owner auth uses a single `OWNER_ADMIN_TOKEN` verified against a signed HttpOnly cookie (hackathon MVP scope)
-- Public API returns only an explicit allowlist of fields — `ownerInput`, `aiDraft`, and internal IDs are never exposed
-- Enquiry endpoint: Zod validation, honeypot field (silent 200 to bots), 3-per-IP-per-hour rate limit
-- All secrets in environment variables; none in code or logs
-
----
-
-## Known limitations (hackathon scope)
-
-- **SMTP**: GoDaddy Platform blocks outbound SMTP ports 465 and 587 — enquiries are saved to the database and the owner can view them, but email delivery is pending. Can be resolved by routing through a transactional email relay (SendGrid, Mailgun) post-hackathon.
-- **Owner auth**: Single shared token — not suitable for multi-owner production use.
-- **Rate limiter**: In-memory store — resets on server restart. Use Redis for production.
-- **No DELETE endpoint**: Test data must be cleaned up directly in the database.
+- **Anonymous owner sessions:** a random 32-byte secret in an `HttpOnly`, `SameSite=Strict` (and `Secure` in
+  production) cookie, valid for 30 days. Only its SHA-256 hash is stored; the secret is never returned to JavaScript.
+- **Ownership checks** on every business-specific route; enquiry status changes are scoped to the business.
+- **Public allowlist:** storefront responses contain only approved fields and visible items — never owner input,
+  AI drafts, session hashes or enquiries.
+- **Abuse and cost controls:** rate limits on enquiries (3/h), business creation (10/h) and analysis (10/h);
+  honeypot field; Zod validation; Claude output schema-validated before use.
+- **Errors:** async route errors return JSON 500s instead of crashing the process.
+- Customer enquiries are never public: they are visible in the owning business's inbox (and to the optional
+  admin fallback), and notification emails go only to the configured `ENQUIRY_TO` address.
 
 ---
 
-## GitHub issues
+## Testing
 
-| Issue | Title | Status |
-|---|---|---|
-| GH-01 | Repo scaffold, README, docs | ✅ Done |
-| GH-02 | React shell + Express health route | ✅ Done |
-| GH-03 | Database models | ✅ Done |
-| GH-04 | Claude structured analysis | ✅ Done |
-| GH-05 | Owner auth, CRUD, publish | ✅ Done |
-| GH-06 | Public storefront | ✅ Done |
-| GH-07 | Enquiry form, rate limiting, honeypot | ✅ Done |
-| GH-08 | GoDaddy deploy, domain, HTTPS, MySQL migration | ✅ Done |
-| GH-09 | QA, README, smoke test (19/19 live) | ✅ Done |
+| Script | What it covers |
+|---|---|
+| `server/scripts/testSessionsAndEnquiries.js` | **35 checks:** session cookies, 401/403 ownership, no hash leakage, availability, public allowlist, enquiry product validation, status updates incl. cross-business protection. Needs `DB_*`; no Claude calls; cleans up its own rows. |
+| `server/scripts/testOwnerSelf.js` | Admin-token path: create, review, publish (calls Claude if a key is set) |
+| `server/scripts/testClaude.js` | Five varied personas — verifies Claude leaves unknown facts null |
+| `server/scripts/testLive.js` | Smoke test against a deployed URL (admin path; creates data — use with care) |
+
+```bash
+node server/scripts/testSessionsAndEnquiries.js
+```
+
+---
+
+## Deployment (GoDaddy Node.js hosting)
+
+GoDaddy hosting has two stages: **PREVIEW** (staging) and **PUBLISH** (production). Both use the same database.
+
+1. `npm run build` — refresh `dist/`
+2. `node server/scripts/makeZip.cjs` — creates `bizdwaar-deploy.zip`
+3. `gddy hosting source upload --app-id <APP_ID> --file bizdwaar-deploy.zip` → updates **PREVIEW** only
+4. `gddy hosting deployment publish --app-id <APP_ID>` → rolls out to **production**
+5. Check `https://bizdwaar.in/api/health` and the served asset hash
+
+Database migrations are additive and run automatically on startup. Details: [docs/deployment-notes.md](docs/deployment-notes.md).
+
+---
+
+## Known limitations
+
+- **Single-browser management:** storefronts are tied to the browser session that created them (30-day cookie).
+  Another browser cannot manage them; there is no account recovery yet.
+- **Email:** one fixed recipient; outbound SMTP may be blocked on the hosting platform. Enquiries are always saved
+  and visible in the inbox.
+- **Rate limiter** is in-memory (resets on restart).
+- **Images** on storefronts are category-based *illustrative* photos (labelled as such); owners cannot upload
+  photos yet.
+- Storefronts created before owner sessions existed can only be managed through the admin fallback.
 
 ---
 
 ## Demo persona
 
-A fictional home-based candle maker in Pune. All prices, sizes and product details on screen are explicitly entered sample data treated as fictional demo data.
+**Sara's Studio** — a *fictional* independent studio in Jaipur making hand-poured candles, painted terracotta and
+block-printed cotton dupattas. All names, prices and details are sample data and are labelled as fictional in the
+product. See [docs/demo-runbook.md](docs/demo-runbook.md).
 
----
+## Credits
+
+Photographs: CC0, WordPress Photo Directory — see `client/public/images/CREDITS.md`.
 
 ## Licence
 

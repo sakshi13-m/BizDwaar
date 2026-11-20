@@ -130,6 +130,26 @@ const Business = {
       }},
       { new: true }
     )
+  },
+
+  // Test-cleanup helpers (used by server/scripts). Delete one business by id or slug.
+  // Requires an exact id/slug — never deletes without a filter.
+  async deleteOne({ _id, id, slug } = {}) {
+    const db = getPool()
+    const key = _id || id
+    if (key) {
+      await db.execute('DELETE FROM businesses WHERE id = ?', [key])
+    } else if (slug) {
+      await db.execute('DELETE FROM businesses WHERE slug = ?', [slug])
+    }
+  },
+
+  // Supports { slug: { $in: [...] } } only
+  async deleteMany({ slug } = {}) {
+    const slugs = slug?.$in
+    if (!Array.isArray(slugs) || slugs.length === 0) return
+    const db = getPool()
+    await db.execute(`DELETE FROM businesses WHERE slug IN (${slugs.map(() => '?').join(',')})`, slugs)
   }
 }
 

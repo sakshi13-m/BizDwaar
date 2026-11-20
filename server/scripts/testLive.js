@@ -46,7 +46,7 @@ const create = await fetch(`${BASE}/api/owner/businesses`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json', Cookie: ownerCookie },
   body: JSON.stringify({
-    businessName: 'Meera Candles Live Test',
+    businessName: "Sara's Studio Live Test",
     businessType: 'Handmade candles',
     location: 'Pune',
     description: 'I make soy wax candles with essential oils. Rose, lavender and lemongrass. Sizes 100g and 200g. Prices from ₹180.',
@@ -77,11 +77,11 @@ const approve = await fetch(`${BASE}/api/owner/businesses/${bizId}`, {
   headers: { 'Content-Type': 'application/json', Cookie: ownerCookie },
   body: JSON.stringify({
     approvedProfile: {
-      businessName: 'Meera Candles',
+      businessName: "Sara's Studio",
       description: 'Handmade soy wax candles. Rose, lavender and lemongrass scents.',
       category: 'Handmade & Craft',
       location: 'Pune',
-      contactEmail: 'meera@example.com',
+      contactEmail: 'sara@example.com',
       contactPhone: '9876543210'
     },
     approvedCatalogue: [
