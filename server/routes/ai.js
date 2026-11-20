@@ -1,8 +1,20 @@
 import { Router } from 'express'
+import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
 import { analyseBusinessInput } from '../services/claudeService.js'
+import { requireOwner } from '../middleware/ownerAuth.js'
 
 const router = Router()
+
+// Each call costs Anthropic credits: require an owner session (or admin) and cap per IP
+const analyseLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  message: { error: 'rate_limit_exceeded', message: 'Too many analysis requests. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip
+})
 
 const AnalyseInputSchema = z.object({
   businessName: z.string().min(1).max(200),
@@ -12,7 +24,7 @@ const AnalyseInputSchema = z.object({
   productsRaw:  z.string().max(2000).optional()
 })
 
-router.post('/analyse', async (req, res) => {
+router.post('/analyse', requireOwner, analyseLimiter, async (req, res) => {
   // Validate request body
   const result = AnalyseInputSchema.safeParse(req.body)
   if (!result.success) {

@@ -138,7 +138,7 @@ See `.env.example` for a full template. Secrets must never be committed or prefi
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/api/health` | — | Server health check |
-| POST | `/api/ai/analyse` | — | Run Claude analysis on business input |
+| POST | `/api/ai/analyse` | Owner session | Run Claude analysis on business input (rate-limited) |
 | POST | `/api/owner/login` | — | Exchange token for session cookie |
 | POST | `/api/owner/logout` | cookie | Clear session |
 | POST | `/api/owner/businesses` | cookie | Create business + run Claude |
