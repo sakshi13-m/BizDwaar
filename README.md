@@ -14,8 +14,9 @@
 | Production | https://bizdwaar.in |
 | Direct (GoDaddy) | https://t3xjlpgdqh.c36.airoapp.ai |
 
-No sign-up or access token is needed — open the site and click **Create your business page**.
-On the first screen, **"Fill in a sample business"** loads the fictional demo business, *Sara's Studio*.
+No registration is needed to start — open the site and click **Create your business page**. On the first
+screen, **"Fill in a sample business"** loads the fictional demo business, *Sara's Studio*. Logging in with an
+email code is optional (see [Owner access and accounts](#owner-access-and-accounts)).
 
 Architecture, data model, API and security design: **[docs/architecture.md](docs/architecture.md)** ·
 Demo script: **[docs/demo-runbook.md](docs/demo-runbook.md)**
@@ -57,7 +58,8 @@ owner publishes it, and later edits stay private until the owner publishes again
 
 ### Owner
 
-1. **Describe** — visit `/owner`. An anonymous owner session starts automatically (no login form).
+1. **Describe** — visit `/owner`. An anonymous browser session starts automatically, so a new owner can begin
+   without registering.
 2. **Organise** — Claude returns a structured profile, catalogue items with numeric INR prices,
    *missing-information questions* and *unsupported claims*.
 3. **Approve** — side-by-side "In your words → Organised by Bizdwaar". Every field shows whether it is an AI
@@ -66,14 +68,40 @@ owner publishes it, and later edits stay private until the owner publishes again
    switches them on; availability is shown only if the owner sets it. Flagged claims must be ticked as reviewed
    before the publish button is enabled.
 4. **Publish** — the preview is the real page; publishing creates `/s/:slug`.
-5. **Connect** — customers browse the page and send enquiries, optionally about a specific product.
-   The owner is emailed at their login address (once email is configured).
+5. **Connect** — customers browse the page and send enquiries, optionally about a specific product. If the page
+   belongs to a logged-in owner account, the owner is also emailed at their login address.
 6. **Manage** — enquiries arrive in the owner inbox with status *new / replied / closed*.
-7. **Update** — returning owners see "Welcome back" with their pages. **Log in** with an email one-time code
-   (no password) to keep the pages safe and manage them from any phone or computer; **Log out** ends that
-   device's session. The review screen shows
-   **Draft**, **Live · up to date** or **Live · changes not published yet**. Saved edits stay private; customers
-   keep seeing the last published version until the owner clicks **Preview & update live**.
+7. **Update** — returning owners see "Welcome back" with the pages they can manage (see
+   [Owner access and accounts](#owner-access-and-accounts)). The review screen shows **Draft**,
+   **Live · up to date** or **Live · changes not published yet**. Saved edits stay private; customers keep
+   seeing the last published version until the owner clicks **Preview & update live**.
+
+### Owner access and accounts
+
+Bizdwaar has two kinds of page ownership. Both use an `HttpOnly` session cookie; owners never see or type a token.
+
+| | **Anonymous (default)** | **Logged-in account (optional)** |
+|---|---|---|
+| How it starts | Opening `/owner` creates an anonymous browser session automatically — no registration | **Log in** → enter an email → enter the 6-digit code sent to it (no password) |
+| Who owns a page | The browser session that created it (`businesses.owner_session_hash`) | The account (`businesses.owner_id`) |
+| Where it can be managed | Only in the original browser, while its session cookie lasts (30 days). Clearing cookies or switching device loses access | On any device, after logging in with the same email |
+| Enquiry emails | To the fallback address `ENQUIRY_TO` (the inbox always works) | To the owner's login email |
+
+- **Claiming pages.** Logging in attaches every page created in that browser and not yet owned by an account to
+  the account. The browser then gets a fresh session secret; the old anonymous one stops working.
+- **After login.** Pages created while logged in belong to the account immediately. The owner sees all of their
+  account's pages under "Welcome back" on every device where they log in.
+- **Unclaimed pages stay browser-bound.** An owner who never logs in keeps managing their pages from the
+  original browser only; there is no recovery if that session is lost.
+- **Exclusive ownership.** Once a page belongs to an account, only a logged-in session for that account (or the
+  administrator) can edit it or read its enquiries — not the original anonymous browser, and not other accounts.
+- **Log out** ends that device's session on the server and clears its cookies; the workspace then starts a
+  fresh anonymous session. The button is shown only to logged-in owners, whose pages stay with the account and
+  reappear at the next login. Other devices stay logged in until their own sessions end.
+- **Availability.** The **Log in** buttons appear only when email delivery is configured (`RESEND_API_KEY`);
+  without it, owners use anonymous sessions only.
+- **Administrator.** A separate, optional token login at `/owner/admin` (not an owner account) lists and can
+  manage every page.
 
 ### Customer
 
@@ -115,10 +143,12 @@ Bizdwaar targets Indian micro-businesses, so every price is in **Indian Rupees**
 | Public business page (published, owner-approved fields only) | ✅ Implemented |
 | Customer enquiries with product of interest | ✅ Implemented |
 | Owner inbox with status filters | ✅ Implemented |
-| Returning owners update their page (same browser) | ✅ Implemented |
-| Email notification of enquiries | ✅ Implemented — sent through Resend's HTTPS API (GoDaddy blocks outbound SMTP) to the owner's login email, or `ENQUIRY_TO` for pages without an account. Uses the same delivery path verified for login codes; the inbox remains the source of truth. |
-| Owner login with an email one-time code, logout | ✅ Implemented and verified in production (code received in a real inbox, login succeeded) |
-| Owner pages and enquiries available from any device after login | ✅ Implemented |
+| Start without registration (anonymous browser session owns the page) | ✅ Implemented |
+| Optional email one-time-code login that claims the browser's pages for an account | ✅ Implemented — verified in production (code received in a real inbox, login succeeded) |
+| Account-owned pages and enquiries managed from any device after login | ✅ Implemented |
+| Anonymous (unclaimed) pages managed from the original browser only | ✅ By design — no recovery without logging in |
+| Log out (ends the device's session, clears cookies) | ✅ Implemented |
+| Email notification of enquiries | ✅ Implemented — Resend HTTPS API (GoDaddy blocks outbound SMTP) to the owner's login email, or `ENQUIRY_TO` for pages without an account. Same delivery path as the verified login codes; enquiry emails not separately verified. The inbox remains the source of truth |
 | Administrator view of all business pages (`/owner/admin`) | ✅ Implemented (needs a 32+ character `OWNER_ADMIN_TOKEN`) |
 | Owner photo uploads | ❌ Not built — see *Images* under Known limitations |
 | **Own domain** — "Find a domain on GoDaddy" link on the homepage | ✅ Link to GoDaddy domain search (the owner buys it on GoDaddy) |
@@ -248,7 +278,7 @@ Secrets live only in environment variables — never in code, docs or `VITE_` va
 |---|---|---|---|
 | GET | `/api/health` | Anyone | Health check |
 | POST | `/api/owner/session` | Anyone | Start or reuse an anonymous owner session (HttpOnly cookie) |
-| GET | `/api/owner/businesses` | Owner session | List the caller's business pages |
+| GET | `/api/owner/businesses` | Owner session | List the pages the caller can manage (account pages + this browser's unclaimed pages) |
 | POST | `/api/owner/businesses` | Owner session · 10/h per IP | Create a draft and run Claude analysis |
 | GET | `/api/owner/businesses/:id` | Owner of that business | Load draft + saved data (+ `hasUnpublishedChanges`) |
 | PUT | `/api/owner/businesses/:id` | Owner of that business | Save the working copy (not public until published) |
@@ -257,8 +287,8 @@ Secrets live only in environment variables — never in code, docs or `VITE_` va
 | PATCH | `/api/owner/businesses/:id/enquiries/:enquiryId` | Owner of that business | Set status `new` / `replied` / `closed` |
 | POST | `/api/owner/login/code` | Anyone · 10/15 min per IP, 3 per email | Email a 6-digit login code (valid 10 min) |
 | POST | `/api/owner/login/verify` | Anyone · 30/15 min per IP | Log in with the code; claims this browser's pages |
-| GET | `/api/owner/me` | Anyone | `{ loggedIn, email }` |
-| POST | `/api/owner/logout` | Anyone | End this device's session and clear cookies |
+| GET | `/api/owner/me` | Anyone | `{ loggedIn, email, isAdmin, emailLogin }` — `emailLogin` says whether login is offered |
+| POST | `/api/owner/logout` | Anyone | Delete this device's login session on the server and clear its cookies |
 | POST | `/api/owner/login` | Anyone · 10/15 min per IP | Admin fallback (token) |
 | GET | `/api/owner/admin/businesses` | Admin | Every page with status, owner email and enquiry counts |
 | POST | `/api/ai/analyse` | Owner session · 10/h per IP | Run Claude analysis without saving |
@@ -277,8 +307,9 @@ routes return a JSON **404**; malformed request bodies return **400**.
   returned to JavaScript. Owners never see or type a token.
 - **Email login:** 6-digit one-time codes, stored only as salted SHA-256 hashes, valid 10 minutes, single use,
   5 attempts, a new code cancels the previous one, rate limited per IP and per email. Logging in issues a fresh
-  session secret (no session fixation). Once a page belongs to an account, only that account (or the admin)
-  can manage it; logout ends the session server-side.
+  session secret (no session fixation) recorded in `owner_sessions` with a 30-day expiry; logout deletes it.
+- **Ownership:** account-owned pages (`owner_id`) are managed only by that account's logged-in sessions;
+  unclaimed pages only by the browser session that created them; the administrator can manage all.
 - **Ownership checks** on every business-specific route; enquiry status changes are scoped to the business.
 - **Public allowlist:** the public endpoint returns only the published snapshot's approved fields and visible
   items — never owner input, AI drafts, unpublished edits, session hashes or enquiries.
@@ -338,8 +369,9 @@ Database migrations are additive and run automatically on startup. Details:
 
 ## Known limitations
 
-- **Login is optional:** owners who never log in can manage their pages only from the browser that created them.
-  Login needs an email address; phone/WhatsApp login is planned.
+- **Anonymous pages are browser-bound:** owners who never log in can manage their pages only from the browser
+  session that created them, and lose access if that session is cleared. Login needs an email address;
+  phone/WhatsApp login is planned. Sessions last 30 days.
 - **Email delivery** depends on Resend (GoDaddy blocks outbound SMTP). If the provider is unavailable, owners see
   an honest "couldn't send" message and enquiries are still saved in the inbox. New sending domains can land in
   spam at first.
