@@ -26,9 +26,23 @@ function deserialise(row) {
     status:           row.status,
     // Internal only — strip with toOwnerView() / public allowlist before responding
     ownerSessionHash: row.owner_session_hash || null,
+    ownerId:          row.owner_id || null,
     publishedAt:      row.published_at,
     createdAt:        row.created_at,
     updatedAt:        row.updated_at,
+  }
+}
+
+function toSummary(r) {
+  return {
+    id:          r.id,
+    name:        r.name,
+    slug:        r.slug,
+    status:      r.status,
+    ownerId:     r.owner_id || null,
+    publishedAt: r.published_at,
+    createdAt:   r.created_at,
+    updatedAt:   r.updated_at
   }
 }
 
@@ -53,24 +67,64 @@ const Business = {
   // Lightweight list of businesses owned by an anonymous owner session
   async findByOwnerSessionHash(hash, limit = 50) {
     if (!hash) return []
-    const db = getPool()
-    const [rows] = await db.query(
-      `SELECT id, name, slug, status, published_at, created_at, updated_at
+    const [rows] = await getPool().query(
+      `SELECT id, name, slug, status, owner_id, published_at, created_at, updated_at
          FROM businesses
         WHERE owner_session_hash = ?
         ORDER BY updated_at DESC
         LIMIT ?`,
       [hash, Number(limit)]
     )
-    return rows.map(r => ({
-      id:          r.id,
-      name:        r.name,
-      slug:        r.slug,
-      status:      r.status,
-      publishedAt: r.published_at,
-      createdAt:   r.created_at,
-      updatedAt:   r.updated_at
-    }))
+    return rows.map(toSummary)
+  },
+
+  // Businesses belonging to a logged-in owner account
+  async findByOwnerId(ownerId, limit = 50) {
+    if (!ownerId) return []
+    const [rows] = await getPool().query(
+      `SELECT id, name, slug, status, owner_id, published_at, created_at, updated_at
+         FROM businesses
+        WHERE owner_id = ?
+        ORDER BY updated_at DESC
+        LIMIT ?`,
+      [ownerId, Number(limit)]
+    )
+    return rows.map(toSummary)
+  },
+
+  // Everything the caller can manage: their account's pages plus this browser's unclaimed pages
+  async findForOwner({ ownerId, sessionHash }) {
+    const [mine, browser] = await Promise.all([
+      Business.findByOwnerId(ownerId),
+      Business.findByOwnerSessionHash(sessionHash)
+    ])
+    const seen = new Set()
+    return [...mine, ...browser]
+      .filter(b => (seen.has(b.id) ? false : seen.add(b.id)))
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+  },
+
+  // On login: attach pages created in this browser (and not yet owned by an account) to the owner
+  async claimForOwner(sessionHash, ownerId) {
+    const browser = await Business.findByOwnerSessionHash(sessionHash, 200)
+    const unclaimed = browser.filter(b => !b.ownerId)
+    for (const b of unclaimed) {
+      await getPool().execute('UPDATE businesses SET owner_id = ? WHERE id = ?', [ownerId, b.id])
+    }
+    return unclaimed.length
+  },
+
+  // Admin overview of every page (hackathon scale; newest first)
+  async listAll(limit = 500) {
+    const [rows] = await getPool().query(
+      `SELECT id, name, slug, status, owner_id, owner_session_hash, published_at, created_at, updated_at
+         FROM businesses
+        WHERE 1=1
+        ORDER BY updated_at DESC
+        LIMIT ?`,
+      [Number(limit)]
+    )
+    return rows.map(r => ({ ...toSummary(r), hasBrowserSession: Boolean(r.owner_session_hash) }))
   },
 
   async create(data) {
@@ -78,8 +132,8 @@ const Business = {
     const id = randomUUID()
     await db.execute(
       `INSERT INTO businesses
-        (id, name, slug, category, location, owner_input, ai_draft, approved_profile, approved_catalogue, status, owner_session_hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id, name, slug, category, location, owner_input, ai_draft, approved_profile, approved_catalogue, status, owner_session_hash, owner_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         data.name,
@@ -92,6 +146,7 @@ const Business = {
         JSON.stringify(data.approvedCatalogue || []),
         data.status || 'draft',
         data.ownerSessionHash || null,
+        data.ownerId || null,
       ]
     )
     return Business.findById(id)
@@ -189,10 +244,10 @@ export function hasUnpublishedChanges(business) {
     JSON.stringify(business.approvedCatalogue || []) !== JSON.stringify(live.catalogue)
 }
 
-// Owner-facing representation — never includes the session hash
+// Owner-facing representation — never includes the session hash or account id
 export function toOwnerView(business) {
   if (!business) return null
-  const { ownerSessionHash, ...rest } = business
+  const { ownerSessionHash, ownerId, ...rest } = business
   return { ...rest, hasUnpublishedChanges: hasUnpublishedChanges(business) }
 }
 

@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
 import LandingPage from './pages/LandingPage'
 import OwnerLogin from './pages/OwnerLogin'
+import OwnerSignIn from './pages/OwnerSignIn'
+import AdminPanel from './pages/AdminPanel'
 import Onboarding from './pages/Onboarding'
 import OwnerReview from './pages/OwnerReview'
 import OwnerInbox from './pages/OwnerInbox'
 import PublicStorefront from './pages/PublicStorefront'
 import EnquiryForm from './pages/EnquiryForm'
 import { Logo, LogoMark } from './components/Brand'
-import { startSession, listMyBusinesses } from './api/owner'
+import { startSession, listMyBusinesses, getMe, logout } from './api/owner'
 import './styles/App.css'
 
 // -------------------------------------------------------
@@ -69,27 +71,40 @@ function Stepper({ step }) {
   )
 }
 
-function OwnerShell({ step, showStepper = true, children }) {
+function OwnerShell({ step, showStepper = true, account, children }) {
   return (
     <div className="workspace">
       <nav className="workspace-nav">
         <Logo />
         {showStepper && <Stepper step={step} />}
-        <span className="workspace-nav__tag">Owner workspace</span>
+        <div className="workspace-nav__account">
+          {account?.isAdminMode ? (
+            <span className="workspace-nav__tag">Administrator</span>
+          ) : account?.email ? (
+            <>
+              <span className="workspace-nav__email" title={account.email}>{account.email}</span>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={account.onLogout}>Log out</button>
+            </>
+          ) : account?.onSignIn ? (
+            <button type="button" className="btn btn--ghost btn--sm" onClick={account.onSignIn}>Log in</button>
+          ) : (
+            <span className="workspace-nav__tag">Owner workspace</span>
+          )}
+        </div>
       </nav>
       <main className="workspace-main">{children}</main>
     </div>
   )
 }
 
-// Storefronts this browser session has created — lets returning owners pick up where they left off
-function MyStorefronts({ businesses, onOpen }) {
+// Business pages this owner can manage (their account's pages, or ones started in this browser)
+function MyStorefronts({ businesses, onOpen, loggedIn, onSignIn }) {
   if (!businesses || businesses.length === 0) return null
   return (
     <section className="my-stores">
       <div className="my-stores__head">
         <h2>Welcome back</h2>
-        <p>Continue with a business page you started in this browser, or create a new one below.</p>
+        <p>Continue with one of your business pages, or create a new one below.</p>
       </div>
       <div className="my-stores__list">
         {businesses.map(b => (
@@ -102,10 +117,32 @@ function MyStorefronts({ businesses, onOpen }) {
           </button>
         ))}
       </div>
-      <p className="my-stores__note">
-        Business pages are managed from the browser they were created in during this hackathon version.
-      </p>
+      {loggedIn ? (
+        <p className="my-stores__note">Saved to your account — log in with the same email to manage them from any device.</p>
+      ) : (
+        <p className="my-stores__note">
+          These are saved in this browser only.{' '}
+          <button type="button" className="btn btn--text btn--inline" onClick={onSignIn}>Log in with your email</button>{' '}
+          to keep them safe and manage them from any device.
+        </p>
+      )}
     </section>
+  )
+}
+
+// Prompt shown after publishing when the owner hasn't logged in yet
+function KeepAccessCard({ name, onSignIn }) {
+  return (
+    <div className="keep-access">
+      <div>
+        <strong>Keep access from any device</strong>
+        <p>
+          Right now {name || 'your business page'} can only be managed from this browser. Log in with your
+          email to edit it and read enquiries from any phone or computer.
+        </p>
+      </div>
+      <button type="button" className="btn btn--mango" onClick={onSignIn}>Log in with email</button>
+    </div>
   )
 }
 
@@ -115,7 +152,10 @@ function MyStorefronts({ businesses, onOpen }) {
 function OwnerFlow() {
   // Admin token screen is only reachable at /owner/admin; regular visitors start at onboarding
   const isAdminPath = window.location.pathname.replace(/\/+$/, '') === '/owner/admin'
-  const [step, setStep] = useState(isAdminPath ? 'login' : 'onboarding')
+  const wantsSignIn = new URLSearchParams(window.location.search).has('login')
+  const [step, setStep] = useState(isAdminPath ? 'login' : wantsSignIn ? 'signin' : 'onboarding')
+  const [returnStep, setReturnStep] = useState('onboarding')
+  const [adminMode, setAdminMode] = useState(false)
   const [businessId, setBusinessId] = useState(null)
   const [publishedSlug, setPublishedSlug] = useState(null)
   const [publishedBusinessId, setPublishedBusinessId] = useState(null)
@@ -124,6 +164,14 @@ function OwnerFlow() {
   const [session, setSession] = useState('starting') // 'starting' | 'ready' | 'error'
   const [sessionError, setSessionError] = useState('')
   const [myBusinesses, setMyBusinesses] = useState([])
+  const [me, setMe] = useState({ loggedIn: false, email: null, isAdmin: false })
+
+  async function refreshOwner() {
+    const [who, list] = await Promise.all([getMe(), listMyBusinesses()])
+    if (who.ok) setMe({ loggedIn: who.loggedIn, email: who.email, isAdmin: who.isAdmin })
+    setMyBusinesses(list.ok ? (list.businesses || []) : [])
+    return who
+  }
 
   async function initSession() {
     setSession('starting')
@@ -131,8 +179,9 @@ function OwnerFlow() {
     try {
       const res = await startSession()
       if (!res.ok) throw new Error(res.message || 'Could not start your session.')
-      const list = await listMyBusinesses()
-      setMyBusinesses(list.ok ? (list.businesses || []) : [])
+      const who = await refreshOwner()
+      // Returning admin (cookie still valid) skips the token screen
+      if (isAdminPath && who.isAdmin) { setAdminMode(true); setStep('admin') }
       setSession('ready')
     } catch (err) {
       setSessionError(err.message || 'Network error — could not start your session.')
@@ -161,8 +210,34 @@ function OwnerFlow() {
     setPublishedSlug(null)
     setPublishedBusinessId(null)
     setPublishedName('')
-    // Refresh the list so the storefront just published shows under "Welcome back"
+    // Refresh the list so the page just published shows under "Welcome back"
     listMyBusinesses().then(list => { if (list.ok) setMyBusinesses(list.businesses || []) }).catch(() => {})
+  }
+
+  function goSignIn() {
+    setReturnStep(step === 'signin' ? 'onboarding' : step)
+    setStep('signin')
+  }
+
+  async function handleSignedIn() {
+    await refreshOwner().catch(() => {})
+    setStep(returnStep || 'onboarding')
+  }
+
+  async function handleLogout() {
+    const msg = adminMode
+      ? 'Log out of the administrator view?'
+      : 'Log out on this device? Any unsaved changes will be lost. You can log back in with your email.'
+    if (!window.confirm(msg)) return
+    await logout().catch(() => {})
+    setAdminMode(false)
+    setMe({ loggedIn: false, email: null, isAdmin: false })
+    setBusinessId(null)
+    setPublishedSlug(null)
+    setPublishedBusinessId(null)
+    setPublishedName('')
+    setStep(isAdminPath ? 'login' : 'onboarding')
+    initSession()
   }
 
   function copyLink(url) {
@@ -186,17 +261,44 @@ function OwnerFlow() {
     }
   }
 
+  const account = {
+    email: me.loggedIn ? me.email : null,
+    isAdminMode: adminMode,
+    onSignIn: goSignIn,
+    onLogout: handleLogout
+  }
+
   if (step === 'login') {
     return (
       <OwnerShell step="onboarding" showStepper={false}>
-        <OwnerLogin onLogin={() => setStep('onboarding')} />
+        <OwnerLogin onLogin={() => { setAdminMode(true); setStep('admin') }} />
+      </OwnerShell>
+    )
+  }
+
+  if (step === 'admin') {
+    return (
+      <OwnerShell step="onboarding" showStepper={false} account={account}>
+        <AdminPanel
+          onOpen={(b) => { setBusinessId(b.id); setPublishedSlug(b.slug); setPublishedBusinessId(b.id); setPublishedName(b.name); setStep('review') }}
+          onInbox={(b) => { setPublishedSlug(b.slug); setPublishedBusinessId(b.id); setPublishedName(b.name); setStep('inbox') }}
+          onLogout={handleLogout}
+        />
+      </OwnerShell>
+    )
+  }
+
+  if (step === 'signin') {
+    return (
+      <OwnerShell step="onboarding" showStepper={false}>
+        <OwnerSignIn onSignedIn={handleSignedIn} onCancel={() => setStep(returnStep || 'onboarding')} />
       </OwnerShell>
     )
   }
 
   if (step === 'onboarding') {
     return (
-      <OwnerShell step="onboarding">
+      <OwnerShell step="onboarding" account={account}>
         {session === 'starting' && (
           <div className="state-panel">
             <span className="spinner" aria-hidden="true" />
@@ -212,7 +314,13 @@ function OwnerFlow() {
         )}
         {session === 'ready' && (
           <>
-            <MyStorefronts businesses={myBusinesses} onOpen={openExisting} />
+            {!me.loggedIn && myBusinesses.length === 0 && (
+              <p className="returning-note">
+                Already have a business page?{' '}
+                <button type="button" className="btn btn--text btn--inline" onClick={goSignIn}>Log in with your email</button>
+              </p>
+            )}
+            <MyStorefronts businesses={myBusinesses} onOpen={openExisting} loggedIn={me.loggedIn} onSignIn={goSignIn} />
             <Onboarding
               onCreated={(id) => {
                 setBusinessId(id)
@@ -227,14 +335,17 @@ function OwnerFlow() {
 
   if (step === 'review') {
     return (
-      <OwnerShell step="review">
+      <OwnerShell step="review" showStepper={!adminMode} account={account}>
+        {adminMode && (
+          <button type="button" className="btn btn--text" onClick={() => setStep('admin')}>← All business pages</button>
+        )}
         <OwnerReview
           businessId={businessId}
           onPublished={(slug, name) => {
             setPublishedSlug(slug)
             setPublishedBusinessId(businessId)
             setPublishedName(name || '')
-            setStep('published')
+            setStep(adminMode ? 'admin' : 'published')
           }}
         />
       </OwnerShell>
@@ -243,12 +354,12 @@ function OwnerFlow() {
 
   if (step === 'inbox') {
     return (
-      <OwnerShell step="inbox">
+      <OwnerShell step="inbox" showStepper={!adminMode} account={account}>
         <OwnerInbox
           businessId={publishedBusinessId}
           businessName={publishedName || publishedSlug}
           storefrontUrl={`${window.location.origin}/s/${publishedSlug}`}
-          onBack={() => setStep('published')}
+          onBack={() => setStep(adminMode ? 'admin' : 'published')}
         />
       </OwnerShell>
     )
@@ -257,7 +368,7 @@ function OwnerFlow() {
   if (step === 'published') {
     const url = `${window.location.origin}/s/${publishedSlug}`
     return (
-      <OwnerShell step="published">
+      <OwnerShell step="published" account={account}>
         <section className="published">
           <div className="published__art" aria-hidden="true">
             <div className="published__arch"><LogoMark size={56} /></div>
@@ -275,6 +386,8 @@ function OwnerFlow() {
                 {copyFeedback || 'Copy link'}
               </button>
             </div>
+
+            {!me.loggedIn && <KeepAccessCard name={publishedName} onSignIn={goSignIn} />}
 
             <div className="published__actions">
               <a href={url} target="_blank" rel="noreferrer" className="btn btn--primary">View my business page</a>

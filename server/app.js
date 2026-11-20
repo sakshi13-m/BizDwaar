@@ -5,6 +5,7 @@ import { existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 import aiRouter from './routes/ai.js'
 import ownerRouter from './routes/owner.js'
+import authRouter from './routes/auth.js'
 import publicRouter from './routes/public.js'
 import enquiryRouter from './routes/enquiry.js'
 
@@ -34,6 +35,7 @@ export function createApp({ serveClient = true } = {}) {
 
   // API routes
   app.use('/api/ai', aiRouter)
+  app.use('/api/owner', authRouter)   // email login, logout, /me, admin list
   app.use('/api/owner', ownerRouter)
   app.use('/api/businesses', publicRouter) // Public GET /api/businesses/:slug
   app.use('/api/enquiries', enquiryRouter)  // Public POST /api/enquiries

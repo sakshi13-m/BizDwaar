@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
 import Business, { publicSnapshot } from '../models/Business.js'
 import Enquiry from '../models/Enquiry.js'
+import Owner from '../models/Owner.js'
 import { sendEnquiryEmail } from '../services/emailService.js'
 
 const router = Router()
@@ -92,8 +93,9 @@ async function handleEnquiry(req, res) {
     notificationStatus: 'pending'
   })
 
-  // Attempt to send email
-  const emailResult = await sendEnquiryEmail(enquiry, business)
+  // Attempt to notify the owner (their login email if the page belongs to an account)
+  const owner = await Owner.findById(business.ownerId).catch(() => null)
+  const emailResult = await sendEnquiryEmail(enquiry, business, owner?.email || null)
   if (emailResult.sent) {
     enquiry.notificationStatus = 'sent'
     enquiry.notificationAttemptedAt = new Date()

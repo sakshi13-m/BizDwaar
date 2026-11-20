@@ -1,5 +1,6 @@
 import { randomBytes, createHash, timingSafeEqual } from 'crypto'
 import Business from '../models/Business.js'
+import { OwnerSession } from '../models/Owner.js'
 
 /**
  * Anonymous owner sessions.
@@ -13,7 +14,7 @@ import Business from '../models/Business.js'
  */
 
 export const OWNER_SESSION_COOKIE = 'bdOwnerSession'
-const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
+export const SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
 const SECRET_PATTERN = /^[a-f0-9]{64}$/
 
 export function hashSessionSecret(secret) {
@@ -68,26 +69,59 @@ export function startOwnerSession(req, res) {
   if (readSessionSecret(req)) {
     return res.json({ ok: true, created: false })
   }
-  const secret = randomBytes(32).toString('hex')
-  res.cookie(OWNER_SESSION_COOKIE, secret, sessionCookieOptions())
+  issueSessionCookie(res)
   return res.status(201).json({ ok: true, created: true })
 }
 
+// Set a brand-new session secret cookie; returns its hash (the raw secret never leaves the cookie)
+export function issueSessionCookie(res) {
+  const secret = randomBytes(32).toString('hex')
+  res.cookie(OWNER_SESSION_COOKIE, secret, sessionCookieOptions())
+  return hashSessionSecret(secret)
+}
+
+export function currentSessionHash(req) {
+  const secret = readSessionSecret(req)
+  return secret ? hashSessionSecret(secret) : null
+}
+
 /**
- * Requires either an anonymous owner session or the admin cookie.
- * Sets req.ownerSessionHash (may be null for admin-only) and req.isAdmin.
+ * Reads the caller's identity without rejecting anyone:
+ * req.ownerSessionHash (browser session), req.ownerId (logged-in account, if any), req.isAdmin.
+ */
+export async function loadOwner(req, res, next) {
+  try {
+    req.ownerSessionHash = currentSessionHash(req)
+    req.ownerId = await OwnerSession.ownerIdFor(req.ownerSessionHash)
+    req.isAdmin = isAdminRequest(req)
+    next()
+  } catch (err) {
+    next(err)
+  }
+}
+
+/**
+ * Requires a browser session (anonymous or logged in) or the admin cookie.
  */
 export function requireOwner(req, res, next) {
-  const secret = readSessionSecret(req)
-  req.ownerSessionHash = secret ? hashSessionSecret(secret) : null
-  req.isAdmin = isAdminRequest(req)
+  loadOwner(req, res, (err) => {
+    if (err) return next(err)
+    if (!req.ownerSessionHash && !req.isAdmin) {
+      return res.status(401).json({
+        error: 'unauthorised',
+        message: 'Owner session required. Please reload the page to start a new session.'
+      })
+    }
+    next()
+  })
+}
 
-  if (!req.ownerSessionHash && !req.isAdmin) {
-    return res.status(401).json({
-      error: 'unauthorised',
-      message: 'Owner session required. Please reload the page to start a new session.'
-    })
+/** Admin-only routes (the admin fallback cookie). */
+export function requireAdmin(req, res, next) {
+  if (!isAdminRequest(req)) {
+    return res.status(403).json({ error: 'forbidden', message: 'Administrator access required.' })
   }
+  req.isAdmin = true
   next()
 }
 
@@ -103,15 +137,20 @@ export async function requireBusinessOwnership(req, res, next) {
       return res.status(404).json({ error: 'not_found', message: 'Business not found.' })
     }
 
-    const owns = Boolean(req.ownerSessionHash) &&
-      Boolean(business.ownerSessionHash) &&
+    // Owned by the logged-in account, or (not yet claimed by any account) created in this browser
+    const ownsByAccount = Boolean(req.ownerId) && Boolean(business.ownerId) &&
+      safeEqual(req.ownerId, business.ownerId)
+    const ownsByBrowser = !business.ownerId &&
+      Boolean(req.ownerSessionHash) && Boolean(business.ownerSessionHash) &&
       safeEqual(req.ownerSessionHash, business.ownerSessionHash)
 
-    if (!owns && !req.isAdmin) {
+    if (!ownsByAccount && !ownsByBrowser && !req.isAdmin) {
       return res.status(403).json({
         error: 'forbidden',
-        message: 'This business page can only be managed from the browser it was created in. ' +
-          'In this hackathon version, business pages are managed from the original browser session.'
+        message: business.ownerId
+          ? 'Log in with the email address that manages this business page.'
+          : 'This business page can only be managed from the browser it was created in, ' +
+            'or after logging in from that browser.'
       })
     }
 

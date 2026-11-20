@@ -55,9 +55,12 @@ export default function LandingPage() {
           <button type="button" onClick={() => scrollToId('example')}>Example</button>
           <button type="button" onClick={() => scrollToId('plans')}>What's free</button>
         </div>
-        <button type="button" className="btn btn--primary btn--sm" onClick={() => navigate('/owner')}>
-          Create your business page
-        </button>
+        <div className="site-nav__cta">
+          <button type="button" className="btn btn--text" onClick={() => navigate('/owner?login=1')}>Log in</button>
+          <button type="button" className="btn btn--primary btn--sm" onClick={() => navigate('/owner')}>
+            Create your business page
+          </button>
+        </div>
       </nav>
 
       {/* ---------- Hero ---------- */}

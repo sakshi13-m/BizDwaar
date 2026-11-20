@@ -5,8 +5,7 @@ import {
   requireOwner,
   requireBusinessOwnership,
   startOwnerSession,
-  isAdminRequest,
-  OWNER_SESSION_COOKIE
+  isAdminRequest
 } from '../middleware/ownerAuth.js'
 import Business, { toOwnerView } from '../models/Business.js'
 import Enquiry from '../models/Enquiry.js'
@@ -103,23 +102,17 @@ router.post('/login', loginLimiter, (req, res) => {
   return res.json({ ok: true, message: 'Admin session started.' })
 })
 
-// -------------------------------------------------------
-// POST /api/owner/logout
-// Clears the admin cookie and the anonymous owner session
-// -------------------------------------------------------
-router.post('/logout', (req, res) => {
-  res.clearCookie('ownerToken')
-  res.clearCookie(OWNER_SESSION_COOKIE, { path: '/' })
-  return res.json({ ok: true, message: 'Logged out.' })
-})
+// POST /api/owner/logout lives in routes/auth.js (also ends the login session)
 
 // -------------------------------------------------------
 // GET /api/owner/businesses  (session owner)
 // List the caller's own storefronts (for returning owners)
 // -------------------------------------------------------
 router.get('/businesses', requireOwner, wrap(async (req, res) => {
-  const businesses = await Business.findByOwnerSessionHash(req.ownerSessionHash)
-  return res.json({ ok: true, businesses })
+  const businesses = await Business.findForOwner({ ownerId: req.ownerId, sessionHash: req.ownerSessionHash })
+  // Pages claimed by an account are only listed for that account
+  const visible = businesses.filter(b => !b.ownerId || b.ownerId === req.ownerId)
+  return res.json({ ok: true, businesses: visible.map(({ ownerId, ...b }) => b) })
 }))
 
 // -------------------------------------------------------
@@ -177,7 +170,9 @@ router.post('/businesses', requireOwner, createLimiter, wrap(async (req, res) =>
     ownerInput: { description, rawProductFacts: productsRaw || null },
     aiDraft,
     // Admin-only requests without an anonymous session leave this NULL (admin-managed)
-    ownerSessionHash: req.ownerSessionHash
+    ownerSessionHash: req.ownerSessionHash,
+    // Logged-in owners own the page through their account (any device)
+    ownerId: req.ownerId || null
   })
 
   return res.status(201).json({ ok: true, businessId: business._id, slug: business.slug })

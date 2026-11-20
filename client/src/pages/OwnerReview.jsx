@@ -114,8 +114,18 @@ function resolveQuestion(q, catalogue) {
 
 // "delivery_area" → "Delivery area: " — the line a free-text answer is typed after
 // "paymentMethods" / "delivery_area" → "Payment methods: " — readable on the public page
+const FRIENDLY_FIELDS = {
+  price: 'Price', unitorsize: 'Size / unit', unit: 'Size / unit', size: 'Size',
+  contactphone: 'Contact phone', contactemail: 'Contact email', phone: 'Contact phone', email: 'Contact email',
+  availability: 'Availability', description: 'Description', name: 'Name', location: 'Location', category: 'Category'
+}
+
 function answerPrefix(q) {
-  const label = (q.field || 'Answer')
+  // "catalogueDrafts[2].price" → "price"; internal path prefixes never reach the owner
+  const raw = (q.field || 'Answer').replace(/^(catalogue(drafts)?|items?|approved\w*|profile)(\[\d+\])?\./i, '')
+  const friendly = FRIENDLY_FIELDS[raw.replace(/[^a-z]/gi, '').toLowerCase()]
+  if (friendly) return `${friendly}: `
+  const label = raw
     .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/[\[\]._]+/g, ' ')
     .replace(/\b\d+\b/g, '')

@@ -10,6 +10,7 @@
 | 1:30–1:55 | **Preview & publish** | The preview is the real page. Publish → shareable link. |
 | 1:55–2:25 | Open the business page as a customer → **Ask about this** on a product → send an enquiry | Confirmed prices (₹), sizes and availability only. Blank prices say "Price on request". The enquiry carries the product of interest. |
 | 2:25–2:50 | Owner workspace → **View enquiries** → **Mark as replied**; then **Edit business page**, change a price, **Save changes** | The status shows "Live · changes not published yet" and the public page is unchanged — nothing goes live until Sara approves it. **Preview & update live** publishes the change. |
+| (optional) | **Log in** with email → enter the code → the page is now manageable from any phone. | Only if email is configured and you've rehearsed it. |
 | 2:50–3:00 | Close | Free to start. Own domain and premium website setup are planned upgrades. AI drafts, the owner decides. |
 
 ## Demo business — Sara's Studio (fictional)
@@ -43,7 +44,8 @@ The **"Fill in a sample business"** button on the onboarding screen loads exactl
 - [ ] For the live "create" part, either use a second browser profile (fresh owner session) or show the
       already-published page and walk through **Edit business page** instead
 - [ ] A second browser or incognito window ready for the customer view
-- [ ] Remember the enquiry email depends on SMTP — show the **inbox** as the source of truth
+- [ ] If `RESEND_API_KEY` is configured, log in to the demo browser with your email first (so the page belongs to
+      your account and enquiry emails reach you). If not, skip login in the demo — the inbox is the source of truth
 - [ ] Each "Organise" run calls Claude and creation is limited to 10 per hour per network — rehearse sparingly
       on the venue network
 - [ ] Afterwards, demo pages stay in the database. Note their slugs if you want them removed.

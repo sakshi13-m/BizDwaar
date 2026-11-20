@@ -101,3 +101,35 @@ export async function getEnquiries(businessId) {
   })
   return parse(res)
 }
+
+// ---------- Owner email login ----------
+export async function getMe() {
+  const res = await fetch('/api/owner/me', { credentials: 'include' })
+  return parse(res)
+}
+
+export async function requestLoginCode(email) {
+  const res = await fetch('/api/owner/login/code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+    credentials: 'include'
+  })
+  return parse(res)
+}
+
+export async function verifyLoginCode(email, code) {
+  const res = await fetch('/api/owner/login/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code }),
+    credentials: 'include'
+  })
+  return parse(res)
+}
+
+// ---------- Admin ----------
+export async function adminListBusinesses() {
+  const res = await fetch('/api/owner/admin/businesses', { credentials: 'include' })
+  return parse(res)
+}

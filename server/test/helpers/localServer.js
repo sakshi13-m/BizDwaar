@@ -39,8 +39,13 @@ Object.assign(process.env, {
   ANTHROPIC_API_KEY: 'local',
   ANTHROPIC_BASE_URL: `http://127.0.0.1:${fakeClaude.address().port}`,
   ENQUIRY_TO: '',
-  OWNER_ADMIN_TOKEN: ''
+  OWNER_ADMIN_TOKEN: process.env.LOCAL_ADMIN_TOKEN || 'local-admin-token-for-preview-only-0000'
 })
+
+// Emails (login codes, enquiry notifications) are printed here instead of being sent
+const { setEmailTransportForTests } = await import('../../services/emailService.js')
+setEmailTransportForTests(async (msg) => console.log(`
+[email to ${msg.to}] ${msg.subject}`))
 
 const { setPoolForTests } = await import('../../db.js')
 setPoolForTests(createFakePool())
@@ -76,4 +81,6 @@ await fetch(`${base}/api/enquiries`, {
 })
 
 console.log(`Local preview: ${base}  ·  storefront ${base}/s/${created.slug}`)
-console.log(`Owner cookie for this seeded storefront (local only): ${cookie}`)
+console.log(`Admin (local only): open ${base}/owner/admin with token ${process.env.OWNER_ADMIN_TOKEN}`)
+console.log('Login codes are printed below when requested.')
+console.log(`Seeded owner cookie (local only): ${cookie}`)

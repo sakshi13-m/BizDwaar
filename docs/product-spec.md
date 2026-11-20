@@ -36,7 +36,7 @@ Instagram, paper notes or word of mouth, and who may not be technically confiden
 | 3. Approve | Edit, answer questions, review claims, choose visible items | AI draft and owner-approved facts kept separate; items start hidden |
 | 4. Publish | Preview the real page and explicitly publish | Mobile-friendly business page at a shareable URL (`/s/:slug`) |
 | 5. Connect | Customer browses and sends an enquiry, optionally about a product | Enquiry stored against the business |
-| 6. Manage | Owner reads enquiries and marks them replied / closed | Private inbox with status filters; email notification is best effort |
+| 6. Manage | Owner reads enquiries and marks them replied / closed; logs in with an email code to manage from any device | Private inbox with status filters; email notification to the owner once the email provider is configured |
 | 7. Update | Owner edits products and prices | Edits stay private ("changes not published yet") until the owner publishes again |
 
 ## AI trust rule

@@ -25,7 +25,7 @@ flowchart LR
 
   DB[(MySQL<br/>GoDaddy hosted)]
   AI[Anthropic Claude API]
-  M[SMTP mailbox]
+  M[Resend email API<br/>HTTPS]
 
   O -- "JSON /api/owner/*<br/>HttpOnly session cookie" --> E
   C -- "GET /api/businesses/:slug<br/>POST /api/enquiries" --> E
@@ -36,7 +36,9 @@ flowchart LR
 
 - **One deployable unit.** Express serves both the API and the Vite-built React app (`dist/`), so the browser
   only ever talks to one origin. There is no separate frontend host and no CORS.
-- **Secrets stay server-side.** The Claude key, database credentials and SMTP password never reach the client.
+- **Secrets stay server-side.** The Claude key, database credentials and email API key never reach the client.
+- **Email over HTTPS.** GoDaddy hosting blocks outbound SMTP (`connect EACCES …:587` in production logs), so
+  login codes and enquiry notifications use Resend's HTTPS API. Nothing is sent until it is configured.
 - **Shared price logic.** `shared/price.js` (INR parsing and `en-IN` formatting) is imported by both the
   server and the React build, so validation and display can't drift apart.
 - **Stateless app tier.** Sessions are verified by hashing the cookie and comparing it with the database, so the
@@ -74,7 +76,7 @@ sequenceDiagram
   Owner->>API: later edits: PUT (stay private) … publish again to go live
   Customer->>API: POST /api/enquiries (optional productName)
   API->>DB: INSERT enquiry (status=new)
-  API--)API: try SMTP notification (failure recorded, not shown to customer)
+  API--)API: email owner via HTTPS API (failure recorded, not shown to customer)
   Owner->>API: GET /enquiries · PATCH status
 ```
 
@@ -127,9 +129,30 @@ erDiagram
     json published_catalogue "snapshot at publish, public, nullable"
     enum status "draft | published"
     datetime published_at
-    char64 owner_session_hash "SHA-256 of session secret, nullable"
+    char64 owner_session_hash "browser that created it, nullable"
+    char36 owner_id "account that owns it, nullable"
     datetime created_at
     datetime updated_at
+  }
+  OWNERS ||--o{ BUSINESSES : manages
+  OWNERS ||--o{ OWNER_SESSIONS : "logged in on"
+  OWNERS {
+    char36 id PK
+    varchar email UK
+    datetime last_login_at
+  }
+  OWNER_SESSIONS {
+    char64 session_hash PK "SHA-256 of cookie secret"
+    char36 owner_id FK
+    datetime expires_at
+  }
+  LOGIN_CODES {
+    char36 id PK
+    varchar email
+    char64 code_hash "salted SHA-256"
+    int attempts
+    datetime expires_at
+    datetime consumed_at
   }
   ENQUIRIES {
     char36 id PK
@@ -189,7 +212,11 @@ NULL keeps serving `approved_*` exactly as before, until the owner next publishe
 | GET | `/api/owner/businesses/:id/enquiries` | owner | — | `{ enquiries: [...] }` (latest 50) |
 | PATCH | `/api/owner/businesses/:id/enquiries/:enquiryId` | owner | `{ status }` | `{ enquiry }` · `404` if not this business's |
 | POST | `/api/owner/login` | —, 10/15 min/IP | `{ token }` | admin cookie (optional fallback; token must be ≥ 32 chars) |
-| POST | `/api/owner/logout` | — | — | clears cookies |
+| POST | `/api/owner/login/code` | —, 10/15 min/IP, 3/email | `{ email }` | emails a 6-digit code · `503` if email can't be sent |
+| POST | `/api/owner/login/verify` | —, 30/15 min/IP | `{ email, code }` | `{ email, claimed }` + new session cookie |
+| GET | `/api/owner/me` | — | — | `{ loggedIn, email, isAdmin }` |
+| POST | `/api/owner/logout` | — | — | ends the login session, clears cookies |
+| GET | `/api/owner/admin/businesses` | admin | — | every page with status, owner email, enquiry counts |
 | POST | `/api/ai/analyse` | session, 10/h/IP | as create | `{ draft }` (not saved) |
 | GET | `/api/businesses/:slug` | — | — | published snapshot, allowlisted, visible items only, `currency: "INR"` |
 | POST | `/api/enquiries` | —, 3/h/IP | `{ businessSlug, customerName, customerEmail?, customerPhone?, message, productName?, website(honeypot) }` | `{ ok, message }` |
@@ -217,6 +244,8 @@ flowchart LR
 | Concern | Control |
 |---|---|
 | Owner identity | Server-generated 32-byte random secret; `HttpOnly`, `SameSite=Strict`, `Secure` (prod), 30 days. Only the SHA-256 hash is stored, and comparisons are constant-time. |
+| Owner login | Email one-time code: salted SHA-256 at rest, 10-minute expiry, single use, 5 attempts, newest code cancels older ones, per-IP and per-email limits. Login rotates the session secret and stores it in `owner_sessions`; logout deletes it. |
+| Ownership rule | A page with an `owner_id` is managed only by that account (any device). A page without one is managed only by the browser that created it until that browser logs in and claims it. The admin can manage every page. |
 | Authorisation | `requireOwner` and `requireBusinessOwnership` on every business route; enquiry updates are scoped by `business_id`. Changing an ID in the URL cannot reach another owner's data. |
 | CSRF | `SameSite=Strict` cookies; JSON-only state-changing endpoints. |
 | Data exposure | The public endpoint builds an explicit allowlist from the published snapshot. `owner_input`, `ai_draft`, unpublished edits, session hashes and enquiries are never public. |
@@ -236,8 +265,8 @@ These are **planned** and do not exist in the code today.
 |---|---|
 | Own custom domain | Owner searches for a domain via GoDaddy and sees real availability and price, buys it in the owner's name, and Bizdwaar connects it to the business page. Fees would be disclosed; no partnership or commission is assumed. |
 | Premium website setup | Paid design and customisation, extra pages and galleries, hosting and maintenance. |
-| Owner accounts | Email or phone sign-in to manage business pages across devices; claim existing browser-session pages. |
+| Phone / WhatsApp login | One-time codes by SMS or WhatsApp for owners without email. |
 | Owner photo uploads | Replace the illustrative imagery and branded tiles with the owner's own product photos (needs durable storage, size/type limits, EXIF stripping). |
 | Saved claim reviews | Persist the "I've reviewed this" ticks and enforce them on the server at publish. |
-| Per-owner notifications | Email or WhatsApp to each owner instead of one fixed `ENQUIRY_TO`, via a transactional email provider. |
+| WhatsApp notifications | Notify owners of enquiries on WhatsApp as well as email. |
 | Shared rate-limit store | Redis or a DB-backed limiter for multi-instance deployments. |

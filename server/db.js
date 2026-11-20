@@ -131,4 +131,39 @@ async function runAdditiveMigrations() {
   // exactly as before, so this migration copies or rewrites no data.
   await addColumnIfMissing('businesses', 'published_profile', 'JSON NULL DEFAULT NULL')
   await addColumnIfMissing('businesses', 'published_catalogue', 'JSON NULL DEFAULT NULL')
+
+  // Owner email login. New tables only; businesses gain a nullable owner_id that is set
+  // when an owner logs in and claims the pages created in their browser. Existing rows keep NULL.
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS owners (
+      id            CHAR(36)     NOT NULL PRIMARY KEY,
+      email         VARCHAR(254) NOT NULL UNIQUE,
+      created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_login_at DATETIME     DEFAULT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS owner_sessions (
+      session_hash CHAR(64)  NOT NULL PRIMARY KEY,
+      owner_id     CHAR(36)  NOT NULL,
+      created_at   DATETIME  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      expires_at   DATETIME  NOT NULL,
+      INDEX idx_owner_sessions_owner (owner_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  await pool.execute(`
+    CREATE TABLE IF NOT EXISTS login_codes (
+      id          CHAR(36)     NOT NULL PRIMARY KEY,
+      email       VARCHAR(254) NOT NULL,
+      code_hash   CHAR(64)     NOT NULL,
+      salt        CHAR(32)     NOT NULL,
+      attempts    INT          NOT NULL DEFAULT 0,
+      expires_at  DATETIME     NOT NULL,
+      consumed_at DATETIME     DEFAULT NULL,
+      created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_login_codes_email (email)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `)
+  await addColumnIfMissing('businesses', 'owner_id', 'CHAR(36) NULL DEFAULT NULL')
+  await addIndexIfMissing('businesses', 'idx_owner_id', 'owner_id')
 }

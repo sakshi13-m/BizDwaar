@@ -67,8 +67,11 @@ owner publishes it, and later edits stay private until the owner publishes again
    before the publish button is enabled.
 4. **Publish** — the preview is the real page; publishing creates `/s/:slug`.
 5. **Connect** — customers browse the page and send enquiries, optionally about a specific product.
+   The owner is emailed at their login address (once email is configured).
 6. **Manage** — enquiries arrive in the owner inbox with status *new / replied / closed*.
-7. **Update** — returning owners see "Welcome back" with their pages. The review screen shows
+7. **Update** — returning owners see "Welcome back" with their pages. **Log in** with an email one-time code
+   (no password) to keep the pages safe and manage them from any phone or computer; **Log out** ends that
+   device's session. The review screen shows
    **Draft**, **Live · up to date** or **Live · changes not published yet**. Saved edits stay private; customers
    keep seeing the last published version until the owner clicks **Preview & update live**.
 
@@ -113,8 +116,10 @@ Bizdwaar targets Indian micro-businesses, so every price is in **Indian Rupees**
 | Customer enquiries with product of interest | ✅ Implemented |
 | Owner inbox with status filters | ✅ Implemented |
 | Returning owners update their page (same browser) | ✅ Implemented |
-| Email notification of enquiries | ⚠️ Best effort, not verified in production — sent to one configured address (`ENQUIRY_TO`) and depends on outbound SMTP, which GoDaddy hosting may block. The inbox is the reliable channel. |
-| Owner accounts across devices (login) | ❌ Not built — pages are managed from the browser they were created in |
+| Email notification of enquiries | ⚠️ Built, needs email provider setup — sent through Resend's HTTPS API to the owner's login email (or `ENQUIRY_TO`). GoDaddy blocks outbound SMTP, so nothing is delivered until `RESEND_API_KEY` is configured. The inbox is always the reliable channel. |
+| Owner login with an email one-time code, logout | ✅ Implemented — works in production once the email provider is configured |
+| Owner pages and enquiries available from any device after login | ✅ Implemented |
+| Administrator view of all business pages (`/owner/admin`) | ✅ Implemented (needs a 32+ character `OWNER_ADMIN_TOKEN`) |
 | Owner photo uploads | ❌ Not built — see *Images* under Known limitations |
 | **Own custom domain** (search, buy via GoDaddy, connect) | 🗺️ Planned, not built |
 | **Premium website setup and customisation** | 🗺️ Planned, not built |
@@ -138,7 +143,7 @@ Bizdwaar targets Indian micro-businesses, so every price is in **Indian Rupees**
 | AI | Anthropic Claude via `@anthropic-ai/sdk` (model set by `CLAUDE_MODEL`, default `claude-opus-4-5`) |
 | Validation | Zod (request bodies and Claude output) |
 | Database | MySQL (GoDaddy hosted) via `mysql2` |
-| Email | Nodemailer (SMTP), best effort |
+| Email | Resend HTTPS API (production; GoDaddy blocks SMTP) · Nodemailer SMTP fallback for local use |
 | Hosting | GoDaddy Node.js hosting, domain `bizdwaar.in` (HTTPS at the edge) |
 
 ## Architecture overview
@@ -168,8 +173,8 @@ bizdwaar/
     public/images/        # CC0 photos (credits in CREDITS.md)
     src/
       App.jsx             # router + owner workspace state machine
-      pages/              # LandingPage, Onboarding, OwnerReview, OwnerInbox,
-                          # PublicStorefront, EnquiryForm, OwnerLogin (admin)
+      pages/              # LandingPage, Onboarding, OwnerReview, OwnerInbox, OwnerSignIn,
+                          # PublicStorefront, EnquiryForm, OwnerLogin + AdminPanel (admin)
       components/         # StorefrontView (business page, preview, homepage example), Brand, SmartImage
       lib/                # demoData (Sara's Studio), imagery, navigate
       api/owner.js        # owner API helpers (credentials: 'include')
@@ -181,11 +186,12 @@ bizdwaar/
     middleware/ownerAuth.js   # anonymous owner sessions, ownership checks, admin fallback
     routes/
       owner.js            # session, businesses, publish, enquiries (owner-only)
+      auth.js             # email one-time-code login, logout, /me, admin list
       public.js           # GET /api/businesses/:slug (published snapshot, allowlisted)
       enquiry.js          # POST /api/enquiries (rate limit, honeypot, validation)
       ai.js               # POST /api/ai/analyse (owner session + rate limit)
-    models/               # Business.js, Enquiry.js (MySQL query layer)
-    services/             # claudeService.js (prompt + Zod), emailService.js
+    models/               # Business.js, Enquiry.js, Owner.js (MySQL query layer)
+    services/             # claudeService.js (prompt + Zod), emailService.js (Resend API / SMTP)
     test/                 # npm test — journey tests with an in-memory database
     scripts/              # older MySQL / live integration scripts, ZIP builder
   dist/                   # built client (committed for GoDaddy ZIP deploy)
@@ -220,8 +226,10 @@ Sara's Studio at `/s/saras-studio`. Nothing is saved and no API credits are used
 | `CLAUDE_MODEL` | Claude model ID (default `claude-opus-4-5`) |
 | `DB_HOST` `DB_PORT` `DB_NAME` `DB_USER` `DB_PASSWORD` | MySQL connection (injected automatically on GoDaddy) |
 | `OWNER_ADMIN_TOKEN` | Optional admin fallback for `/owner/admin` (can manage any page). Must be **at least 32 random characters**, otherwise the fallback stays disabled. |
-| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` | SMTP for enquiry notifications (587 = STARTTLS, 465 = TLS) |
-| `ENQUIRY_TO` | Fixed address that receives enquiry notifications |
+| `RESEND_API_KEY` | Resend API key — sends login codes and enquiry notifications over HTTPS (required for login in production) |
+| `EMAIL_FROM` | Sender, e.g. `Bizdwaar <login@bizdwaar.in>` (the domain must be verified in Resend) |
+| `SMTP_HOST` `SMTP_PORT` `SMTP_USER` `SMTP_PASS` | Optional SMTP fallback for local development (blocked on GoDaddy hosting) |
+| `ENQUIRY_TO` | Fallback recipient for enquiries on pages not linked to an owner email |
 | `TRUST_PROXY_HOPS` | Proxy hops to trust for client IPs (rate limiting); 0 locally — see deployment notes |
 | `NODE_ENV` | `production` enables `Secure` cookies |
 | `PORT` | Assigned by the host |
@@ -243,7 +251,12 @@ Secrets live only in environment variables — never in code, docs or `VITE_` va
 | POST | `/api/owner/businesses/:id/publish` | Owner of that business | Publish the saved copy to the public page |
 | GET | `/api/owner/businesses/:id/enquiries` | Owner of that business | List enquiries (latest 50) |
 | PATCH | `/api/owner/businesses/:id/enquiries/:enquiryId` | Owner of that business | Set status `new` / `replied` / `closed` |
-| POST | `/api/owner/login` · `/logout` | Anyone · login 10/15 min per IP | Optional admin fallback (token) / clear cookies |
+| POST | `/api/owner/login/code` | Anyone · 10/15 min per IP, 3 per email | Email a 6-digit login code (valid 10 min) |
+| POST | `/api/owner/login/verify` | Anyone · 30/15 min per IP | Log in with the code; claims this browser's pages |
+| GET | `/api/owner/me` | Anyone | `{ loggedIn, email }` |
+| POST | `/api/owner/logout` | Anyone | End this device's session and clear cookies |
+| POST | `/api/owner/login` | Anyone · 10/15 min per IP | Admin fallback (token) |
+| GET | `/api/owner/admin/businesses` | Admin | Every page with status, owner email and enquiry counts |
 | POST | `/api/ai/analyse` | Owner session · 10/h per IP | Run Claude analysis without saving |
 | GET | `/api/businesses/:slug` | Anyone | Public business page — published, allowlisted fields only |
 | POST | `/api/enquiries` | Anyone · 3/h per IP | Submit enquiry (honeypot, validation, optional `productName`) |
@@ -255,9 +268,13 @@ routes return a JSON **404**; malformed request bodies return **400**.
 
 ## Security and privacy
 
-- **Anonymous owner sessions:** each browser gets a random 32-byte secret in an `HttpOnly`, `SameSite=Strict`
+- **Owner sessions:** each browser gets a random 32-byte secret in an `HttpOnly`, `SameSite=Strict`
   (and `Secure` in production) cookie, valid for 30 days. Only its SHA-256 hash is stored; the secret is never
   returned to JavaScript. Owners never see or type a token.
+- **Email login:** 6-digit one-time codes, stored only as salted SHA-256 hashes, valid 10 minutes, single use,
+  5 attempts, a new code cancels the previous one, rate limited per IP and per email. Logging in issues a fresh
+  session secret (no session fixation). Once a page belongs to an account, only that account (or the admin)
+  can manage it; logout ends the session server-side.
 - **Ownership checks** on every business-specific route; enquiry status changes are scoped to the business.
 - **Public allowlist:** the public endpoint returns only the published snapshot's approved fields and visible
   items — never owner input, AI drafts, unpublished edits, session hashes or enquiries.
@@ -268,7 +285,7 @@ routes return a JSON **404**; malformed request bodies return **400**.
 - **Errors:** API errors return JSON and never crash the process; the server keeps retrying the database if it
   is unavailable at startup.
 - Customer enquiries are never public: they are visible in the owning business's inbox (and to the optional
-  admin fallback), and notification emails go only to the configured `ENQUIRY_TO` address.
+  admin fallback), and notification emails go only to the page owner's login email (or `ENQUIRY_TO`).
 
 ---
 
@@ -283,7 +300,9 @@ The real Express routes and models run against an in-memory database and a fake 
 formatting and missing prices, Claude response parsing, onboarding validation, AI draft creation, owner editing
 and price validation, publishing rules, public visibility and data leakage, unpublished changes staying private,
 enquiry submission and validation, the owner inbox and statuses, cross-owner access (401/403/404), older records,
-the admin token and rate limiting.
+the admin token and rate limiting, and email login: code expiry, reuse and lockout, per-email limits, honest errors
+when email can't be sent, claiming pages at login, access from a second device, logout and the admin list.
+Emails are captured in tests, never sent.
 
 Older integration scripts in `server/scripts/` need a real MySQL database (`DB_*`) and, for some, Claude or an
 admin token:
@@ -314,10 +333,11 @@ Database migrations are additive and run automatically on startup. Details:
 
 ## Known limitations
 
-- **Single-browser management:** business pages are tied to the browser session that created them (30-day
-  cookie). Clearing cookies or switching device loses access; there is no account recovery yet.
-- **Email:** one fixed recipient; outbound SMTP may be blocked on the hosting platform and delivery has not been
-  verified in production. Enquiries are always saved and visible in the inbox.
+- **Login needs an email provider:** owners who never log in can manage their pages only from the browser that
+  created them. Email login works in production only after `RESEND_API_KEY` and a verified sender domain are
+  configured. Owners need an email address; phone/WhatsApp login is planned.
+- **Email delivery** has not yet been verified in production (GoDaddy blocks SMTP; the HTTPS provider must be
+  set up). Enquiries are always saved and visible in the inbox.
 - **Claim review** is enforced in the owner interface, and the "reviewed" ticks are not saved between visits.
 - **Rate limiter** is in-memory (resets on restart) and relies on `TRUST_PROXY_HOPS` being set correctly.
 - **Images:** owners cannot upload photos yet. A product shows a labelled *illustrative* photo only when its own

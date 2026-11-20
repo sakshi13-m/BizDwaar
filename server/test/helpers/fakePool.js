@@ -11,12 +11,24 @@ const JSON_COLUMNS = new Set([
 const DEFAULTS = {
   businesses: () => ({
     category: null, location: null, status: 'draft', published_at: null,
-    owner_session_hash: null, published_profile: null, published_catalogue: null
+    owner_session_hash: null, owner_id: null, published_profile: null, published_catalogue: null
   }),
   enquiries: () => ({
     customer_email: null, customer_phone: null, product_name: null, status: 'new',
     notification_status: 'pending', notification_attempted_at: null
-  })
+  }),
+  owners: () => ({ last_login_at: null }),
+  owner_sessions: () => ({}),
+  login_codes: () => ({ attempts: 0, consumed_at: null })
+}
+
+// Unique keys enforced like MySQL (ER_DUP_ENTRY)
+const UNIQUE = {
+  businesses: ['id', 'slug'],
+  enquiries: ['id'],
+  owners: ['id', 'email'],
+  owner_sessions: ['session_hash'],
+  login_codes: ['id']
 }
 
 // Mimic mysql2: JSON columns come back parsed, everything else as stored
@@ -49,7 +61,7 @@ function parseConditions(where, params) {
 }
 
 export function createFakePool() {
-  const tables = { businesses: [], enquiries: [] }
+  const tables = { businesses: [], enquiries: [], owners: [], owner_sessions: [], login_codes: [] }
   let tick = 0
   const now = () => new Date(Date.UTC(2026, 10, 20, 0, 0, tick++)) // strictly increasing
 
@@ -62,12 +74,15 @@ export function createFakePool() {
       const table = m[1]
       const cols = m[2].split(',').map(c => c.trim())
       const t = now()
+      if (!tables[table]) throw new Error(`fakePool: unknown table ${table}`)
       const row = { ...DEFAULTS[table](), created_at: t, updated_at: t }
       cols.forEach((c, i) => { row[c] = params[i] })
-      if (table === 'businesses' && tables.businesses.some(b => b.slug === row.slug)) {
-        const err = new Error(`Duplicate entry '${row.slug}' for key 'slug'`)
-        err.code = 'ER_DUP_ENTRY'
-        throw err
+      for (const key of UNIQUE[table] || []) {
+        if (tables[table].some(r => r[key] === row[key])) {
+          const err = new Error(`Duplicate entry '${row[key]}' for key '${key}'`)
+          err.code = 'ER_DUP_ENTRY'
+          throw err
+        }
       }
       tables[table].push(row)
       return [{ affectedRows: 1 }]
@@ -102,6 +117,7 @@ export function createFakePool() {
       const match = parseConditions(where, params)
       let rows = tables[table].filter(match)
       if (orderCol) {
+        // Ties keep insertion order, as an unordered MySQL result might — code must not rely on it
         rows = [...rows].sort((a, b) => (a[orderCol] - b[orderCol]) * (orderDir.toUpperCase() === 'DESC' ? -1 : 1))
       }
       if (limit) rows = rows.slice(0, Number(limit === '?' ? params.shift() : limit))

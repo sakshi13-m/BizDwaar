@@ -54,11 +54,9 @@ DB_HOST= DB_PORT= DB_NAME= DB_USER= DB_PASSWORD=   (injected automatically by Go
 ANTHROPIC_API_KEY=
 CLAUDE_MODEL=
 OWNER_ADMIN_TOKEN=    (optional; at least 32 random characters or the admin fallback stays disabled)
-SMTP_HOST=
-SMTP_PORT=
-SMTP_USER=
-SMTP_PASS=
-ENQUIRY_TO=
+RESEND_API_KEY=       (required for owner login and enquiry emails — GoDaddy blocks SMTP)
+EMAIL_FROM=           (e.g. Bizdwaar <login@bizdwaar.in>; domain verified in Resend)
+ENQUIRY_TO=           (fallback recipient for pages without an owner account)
 ```
 
 At startup the server logs a warning (never the value) if `OWNER_ADMIN_TOKEN` is set but too short.
@@ -81,6 +79,7 @@ never drop or rewrite data. Current list:
 | `businesses.owner_session_hash` + index | NULL → older pages are admin-managed only |
 | `enquiries.status` | existing enquiries become `new` |
 | `enquiries.product_name` | NULL |
+| tables `owners`, `owner_sessions`, `login_codes`; `businesses.owner_id` + index | new tables; existing pages keep `owner_id` NULL (managed by their original browser until claimed) |
 | `businesses.published_profile`, `businesses.published_catalogue` | NULL → page keeps serving `approved_*` exactly as before until the owner next publishes |
 
 ## Top deployment risks
@@ -89,7 +88,7 @@ never drop or rewrite data. Current list:
 |---|---|
 | GoDaddy ZIP/build fails | Root `package.json`, correct scripts, Vite in `dependencies`, `shared/` included |
 | Rate limiter sees proxy IP | Verify forwarded headers; configure exact proxy trust hop count |
-| SMTP delivery fails | Enquiry is always stored; notification status recorded; inbox is the source of truth |
+| Email not delivered | GoDaddy blocks SMTP — use the HTTPS email API; enquiries are always stored; login shows an honest "couldn't send" error |
 | Secret leaks | `.gitignore` committed first; no `VITE_` secrets; secrets only in GoDaddy env settings; rotate anything that appears in git history or logs |
 
 ## Notes learned in production
@@ -97,5 +96,13 @@ never drop or rewrite data. Current list:
 - PREVIEW and PUBLISH share the same MySQL database, so migrations run when PREVIEW starts. Migrations must
   stay additive.
 - `source upload` updates PREVIEW only. Production changes only after `hosting deployment publish`.
-- Outbound SMTP may be blocked on the platform. Enquiries are always stored and shown in the owner inbox.
+- Outbound SMTP **is blocked** on the platform (`connect EACCES …:587`). Email goes through Resend's HTTPS API.
+
+## Email provider setup (Resend)
+
+1. Create a Resend account and add the domain `bizdwaar.in`.
+2. Add the DNS records Resend shows (SPF/DKIM, usually TXT and CNAME) in GoDaddy DNS for `bizdwaar.in`; wait
+   until Resend marks the domain verified.
+3. Create an API key with "sending access" and set `RESEND_API_KEY` and `EMAIL_FROM` in the GoDaddy environment.
+4. Test: request a login code at `/owner?login=1` with your own email.
 - Browsers may cache the previous build briefly after a deploy — hard refresh when checking.

@@ -81,6 +81,20 @@ const Enquiry = {
     return Enquiry.findById(id)
   },
 
+  // Admin overview: per-business totals and unanswered ("new") counts
+  async statusCounts(limit = 20000) {
+    const db = getPool()
+    const [rows] = await db.query('SELECT business_id, status FROM enquiries WHERE 1=1 LIMIT ?', [Number(limit)])
+    const counts = new Map()
+    for (const r of rows) {
+      const c = counts.get(r.business_id) || { total: 0, new: 0 }
+      c.total++
+      if ((r.status || 'new') === 'new') c.new++
+      counts.set(r.business_id, c)
+    }
+    return counts
+  },
+
   // Test-cleanup helper: delete one enquiry by exact id
   async deleteOne({ _id, id } = {}) {
     const key = _id || id
