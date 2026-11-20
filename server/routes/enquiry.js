@@ -22,16 +22,27 @@ const enquiryLimiter = rateLimit({
   keyGenerator: (req) => req.ip
 })
 
+// Phone: 8-15 digits, allowing spaces, +, -, dots and brackets (e.g. "+91 98765 43210")
+const PHONE_PATTERN = /^\+?[\d\s().-]{8,25}$/
+const phoneDigits = v => (v.match(/\d/g) || []).length
+
 const EnquirySchema = z.object({
   businessSlug: z.string().min(1).max(200),
-  customerName:  z.string().min(1).max(200),
-  customerEmail: z.string().email().optional().or(z.literal('')),
-  customerPhone: z.string().max(50).optional().or(z.literal('')),
+  customerName:  z.string().trim().min(1).max(200),
+  customerEmail: z.string().trim().email('Please enter a valid email address.').optional().or(z.literal('')),
+  customerPhone: z.string().trim().max(50)
+    .refine(v => v === '' || (PHONE_PATTERN.test(v) && phoneDigits(v) >= 8 && phoneDigits(v) <= 15),
+      'Please enter a valid phone number, e.g. +91 98765 43210.')
+    .optional().or(z.literal('')),
   message:       z.string().min(10).max(2000),
   // Optional: which visible catalogue item the customer is asking about
   productName:   z.string().max(200).optional().or(z.literal('')),
   // Honeypot — normal users never fill this
   website:       z.string().max(0).optional()
+}).refine(d => Boolean(d.customerEmail) || Boolean(d.customerPhone), {
+  // The owner needs a way to reply
+  message: 'Please share an email address or phone number so the owner can reply.',
+  path: ['customerEmail']
 })
 
 router.post('/', enquiryLimiter, (req, res, next) => {
@@ -42,9 +53,11 @@ async function handleEnquiry(req, res) {
   // Validate
   const result = EnquirySchema.safeParse(req.body)
   if (!result.success) {
+    const contactIssue = result.error.issues.find(i =>
+      ['customerEmail', 'customerPhone'].includes(i.path[0]) && i.code !== 'invalid_type')
     return res.status(400).json({
       error: 'validation_error',
-      message: 'Invalid enquiry data.',
+      message: contactIssue?.message || 'Please check the highlighted fields and try again.',
       details: result.error.flatten().fieldErrors
     })
   }

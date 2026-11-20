@@ -242,13 +242,30 @@ test('customer enquiry: validation errors are clear', async () => {
   assert.equal(short.status, 400)
   const badEmail = await call('POST', '/api/enquiries', { body: { businessSlug: slug, customerName: 'Asha', customerEmail: 'nope', message: 'Do you take bulk orders?' } })
   assert.equal(badEmail.status, 400)
-  const unknownBiz = await call('POST', '/api/enquiries', { body: { businessSlug: 'no-such-shop', customerName: 'Asha', message: 'Do you take bulk orders?' } })
+  const unknownBiz = await call('POST', '/api/enquiries', { body: { businessSlug: 'no-such-shop', customerName: 'Asha', customerPhone: '+91 98765 43210', message: 'Do you take bulk orders?' } })
   assert.equal(unknownBiz.status, 404)
-  const notListed = await call('POST', '/api/enquiries', { body: { businessSlug: slug, customerName: 'Asha', message: 'Do you take bulk orders?', productName: 'Secret item' } })
+  const notListed = await call('POST', '/api/enquiries', { body: { businessSlug: slug, customerName: 'Asha', customerEmail: 'asha@example.com', message: 'Do you take bulk orders?', productName: 'Secret item' } })
   assert.equal(notListed.status, 400)
+  assert.match(notListed.json.message, /not available/)
+
+  // The owner needs a way to reply: email or phone is required
+  const noContact = await call('POST', '/api/enquiries', { body: { businessSlug: slug, customerName: 'Asha', message: 'Do you take bulk orders?' } })
+  assert.equal(noContact.status, 400)
+  assert.match(noContact.json.message, /email address or phone number/)
+  const blankContact = await call('POST', '/api/enquiries', { body: { businessSlug: slug, customerName: 'Asha', customerEmail: '', customerPhone: '  ', message: 'Do you take bulk orders?' } })
+  assert.equal(blankContact.status, 400)
+  const badPhone = await call('POST', '/api/enquiries', { body: { businessSlug: slug, customerName: 'Asha', customerPhone: '12345', message: 'Do you take bulk orders?' } })
+  assert.equal(badPhone.status, 400)
+  assert.match(badPhone.json.message, /valid phone number/)
+  assert.equal(pool.tables.enquiries.length, 0, 'nothing stored for invalid enquiries')
 })
 
 test('customer enquiry is stored against the right business and shown in the inbox', async () => {
+  // Phone only is enough
+  const phoneOnly = await call('POST', '/api/enquiries', { body: { businessSlug: slug, customerName: 'Ravi', customerPhone: '+91 98765 43210', message: 'Can you deliver to Malviya Nagar?' } })
+  assert.equal(phoneOnly.status, 200)
+  pool.tables.enquiries.length = 0
+
   const r = await call('POST', '/api/enquiries', {
     body: {
       businessSlug: slug, customerName: 'Asha', customerEmail: 'asha@example.com', customerPhone: '',

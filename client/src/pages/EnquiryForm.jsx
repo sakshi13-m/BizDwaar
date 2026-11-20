@@ -42,6 +42,12 @@ export default function EnquiryForm({ businessSlug }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    // The owner needs a way to reply (the server checks this too)
+    if (!form.customerEmail.trim() && !form.customerPhone.trim()) {
+      setError('Please share an email address or phone number so the owner can reply.')
+      document.getElementById('customerEmail')?.focus()
+      return
+    }
     setLoading(true)
 
     try {
@@ -103,7 +109,7 @@ export default function EnquiryForm({ businessSlug }) {
         <h1 className="enquiry__title">Message {name}</h1>
         <p>Ask about products, prices, custom orders or delivery. Your message is delivered to the owner's Bizdwaar inbox.</p>
         <ul className="enquiry__points">
-          <li>Share an email or phone so they can reply.</li>
+          <li>Add an email or phone number so they can reply.</li>
           <li>Be specific — quantities and dates help the owner answer quickly.</li>
         </ul>
         <p className="enquiry__powered"><LogoMark size={18} /> Powered by Bizdwaar</p>
@@ -123,28 +129,41 @@ export default function EnquiryForm({ businessSlug }) {
             />
           </div>
 
-          <div className="field-pair">
-            <div className="field">
-              <label htmlFor="customerEmail">Email</label>
-              <input
-                id="customerEmail"
-                type="email"
-                value={form.customerEmail}
-                onChange={e => update('customerEmail', e.target.value)}
-                placeholder="you@example.com"
-              />
+          <fieldset className="contact-group">
+            <legend>
+              How can they reply? <span className="req">*</span>
+              <span className="optional">email or phone — at least one</span>
+            </legend>
+            <div className="field-pair">
+              <div className="field">
+                <label htmlFor="customerEmail">Email</label>
+                <input
+                  id="customerEmail"
+                  type="email"
+                  autoComplete="email"
+                  value={form.customerEmail}
+                  onChange={e => update('customerEmail', e.target.value)}
+                  placeholder="you@example.com"
+                  aria-describedby="contact-help"
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="customerPhone">Phone / WhatsApp</label>
+                <input
+                  id="customerPhone"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={form.customerPhone}
+                  onChange={e => update('customerPhone', e.target.value)}
+                  placeholder="+91 98765 43210"
+                  maxLength={25}
+                  aria-describedby="contact-help"
+                />
+              </div>
             </div>
-            <div className="field">
-              <label htmlFor="customerPhone">Phone</label>
-              <input
-                id="customerPhone"
-                value={form.customerPhone}
-                onChange={e => update('customerPhone', e.target.value)}
-                placeholder="+91 98765 43210"
-                maxLength={50}
-              />
-            </div>
-          </div>
+            <p id="contact-help" className="field__help">Shared only with {name}, never shown publicly.</p>
+          </fieldset>
 
           {products.length > 0 && (
             <div className="field">
