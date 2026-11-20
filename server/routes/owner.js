@@ -1,11 +1,34 @@
 import { Router } from 'express'
+import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
-import { requireOwner } from '../middleware/ownerAuth.js'
-import Business from '../models/Business.js'
+import {
+  requireOwner,
+  requireBusinessOwnership,
+  startOwnerSession,
+  isAdminRequest,
+  OWNER_SESSION_COOKIE
+} from '../middleware/ownerAuth.js'
+import Business, { toOwnerView } from '../models/Business.js'
 import Enquiry from '../models/Enquiry.js'
 import { analyseBusinessInput } from '../services/claudeService.js'
 
 const router = Router()
+
+// Forward async errors to Express's error handler instead of crashing the process
+const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next)
+
+// Business creation calls Claude and is now open to anonymous visitors — cap it per IP
+const createLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+  message: {
+    error: 'rate_limit_exceeded',
+    message: 'Too many storefronts created from this network. Please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.ip
+})
 
 // --- Slug helper ---
 function toSlug(name) {
@@ -13,12 +36,18 @@ function toSlug(name) {
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
+    .replace(/^-+|-+$/g, '') || 'storefront'
 }
 
 // -------------------------------------------------------
-// POST /api/owner/login
-// Verifies OWNER_ADMIN_TOKEN; sets signed HttpOnly cookie
+// POST /api/owner/session
+// Start (or reuse) an anonymous owner session. Secret lives only in an HttpOnly cookie.
+// -------------------------------------------------------
+router.post('/session', startOwnerSession)
+
+// -------------------------------------------------------
+// POST /api/owner/login  (optional admin fallback)
+// Verifies OWNER_ADMIN_TOKEN; sets HttpOnly cookie
 // -------------------------------------------------------
 const LoginSchema = z.object({ token: z.string().min(1) })
 
@@ -28,7 +57,8 @@ router.post('/login', (req, res) => {
     return res.status(400).json({ error: 'validation_error', message: 'Token required.' })
   }
 
-  if (result.data.token !== process.env.OWNER_ADMIN_TOKEN) {
+  // Reuse the constant-time comparison from the middleware
+  if (!isAdminRequest({ cookies: { ownerToken: result.data.token } })) {
     return res.status(401).json({ error: 'unauthorised', message: 'Invalid token.' })
   }
 
@@ -39,19 +69,30 @@ router.post('/login', (req, res) => {
     maxAge: 8 * 60 * 60 * 1000 // 8 hours
   })
 
-  return res.json({ ok: true, message: 'Owner session started.' })
+  return res.json({ ok: true, message: 'Admin session started.' })
 })
 
 // -------------------------------------------------------
 // POST /api/owner/logout
+// Clears the admin cookie and the anonymous owner session
 // -------------------------------------------------------
 router.post('/logout', (req, res) => {
   res.clearCookie('ownerToken')
+  res.clearCookie(OWNER_SESSION_COOKIE, { path: '/' })
   return res.json({ ok: true, message: 'Logged out.' })
 })
 
 // -------------------------------------------------------
-// POST /api/businesses  (owner only)
+// GET /api/owner/businesses  (session owner)
+// List the caller's own storefronts (for returning owners)
+// -------------------------------------------------------
+router.get('/businesses', requireOwner, wrap(async (req, res) => {
+  const businesses = await Business.findByOwnerSessionHash(req.ownerSessionHash)
+  return res.json({ ok: true, businesses })
+}))
+
+// -------------------------------------------------------
+// POST /api/owner/businesses  (session owner)
 // Create a new draft business + run Claude analysis
 // -------------------------------------------------------
 const CreateBusinessSchema = z.object({
@@ -62,7 +103,7 @@ const CreateBusinessSchema = z.object({
   productsRaw:  z.string().max(2000).optional()
 })
 
-router.post('/businesses', requireOwner, async (req, res) => {
+router.post('/businesses', requireOwner, createLimiter, wrap(async (req, res) => {
   const result = CreateBusinessSchema.safeParse(req.body)
   if (!result.success) {
     return res.status(400).json({
@@ -103,26 +144,24 @@ router.post('/businesses', requireOwner, async (req, res) => {
     category: businessType || null,
     location: location || null,
     ownerInput: { description, rawProductFacts: productsRaw || null },
-    aiDraft
+    aiDraft,
+    // Admin-only requests without an anonymous session leave this NULL (admin-managed)
+    ownerSessionHash: req.ownerSessionHash
   })
 
   return res.status(201).json({ ok: true, businessId: business._id, slug: business.slug })
-})
+}))
 
 // -------------------------------------------------------
-// GET /api/owner/businesses/:id  (owner only)
+// GET /api/owner/businesses/:id  (owner of this business)
 // Load full draft + approved data for editing
 // -------------------------------------------------------
-router.get('/businesses/:id', requireOwner, async (req, res) => {
-  const business = await Business.findById(req.params.id)
-  if (!business) {
-    return res.status(404).json({ error: 'not_found', message: 'Business not found.' })
-  }
-  return res.json({ ok: true, business })
+router.get('/businesses/:id', requireOwner, requireBusinessOwnership, (req, res) => {
+  return res.json({ ok: true, business: toOwnerView(req.business) })
 })
 
 // -------------------------------------------------------
-// PUT /api/owner/businesses/:id  (owner only)
+// PUT /api/owner/businesses/:id  (owner of this business)
 // Save owner-edited approved fields
 // -------------------------------------------------------
 const UpdateBusinessSchema = z.object({
@@ -144,7 +183,7 @@ const UpdateBusinessSchema = z.object({
   })).optional()
 })
 
-router.put('/businesses/:id', requireOwner, async (req, res) => {
+router.put('/businesses/:id', requireOwner, requireBusinessOwnership, wrap(async (req, res) => {
   const result = UpdateBusinessSchema.safeParse(req.body)
   if (!result.success) {
     return res.status(400).json({
@@ -159,7 +198,7 @@ router.put('/businesses/:id', requireOwner, async (req, res) => {
   if (result.data.approvedCatalogue) update.approvedCatalogue = result.data.approvedCatalogue
 
   const business = await Business.findByIdAndUpdate(
-    req.params.id,
+    req.business.id,
     { $set: update },
     { new: true }
   )
@@ -167,18 +206,15 @@ router.put('/businesses/:id', requireOwner, async (req, res) => {
     return res.status(404).json({ error: 'not_found', message: 'Business not found.' })
   }
 
-  return res.json({ ok: true, business })
-})
+  return res.json({ ok: true, business: toOwnerView(business) })
+}))
 
 // -------------------------------------------------------
-// POST /api/owner/businesses/:id/publish  (owner only)
+// POST /api/owner/businesses/:id/publish  (owner of this business)
 // Validate required fields then publish
 // -------------------------------------------------------
-router.post('/businesses/:id/publish', requireOwner, async (req, res) => {
-  const business = await Business.findById(req.params.id)
-  if (!business) {
-    return res.status(404).json({ error: 'not_found', message: 'Business not found.' })
-  }
+router.post('/businesses/:id/publish', requireOwner, requireBusinessOwnership, wrap(async (req, res) => {
+  const business = req.business
 
   // Require at least a name and description in approvedProfile
   const profile = business.approvedProfile
@@ -200,16 +236,14 @@ router.post('/businesses/:id/publish', requireOwner, async (req, res) => {
   const saved = await Business._save(business)
 
   return res.json({ ok: true, slug: saved.slug, publishedAt: saved.publishedAt })
-})
+}))
 
 // -------------------------------------------------------
-// GET /api/owner/businesses/:id/enquiries  (owner only)
+// GET /api/owner/businesses/:id/enquiries  (owner of this business)
 // -------------------------------------------------------
-router.get('/businesses/:id/enquiries', requireOwner, async (req, res) => {
-  const business = await Business.findById(req.params.id)
-  if (!business) return res.status(404).json({ error: 'not_found', message: 'Business not found.' })
-  const enquiries = await Enquiry.findByBusinessId(business.id)
+router.get('/businesses/:id/enquiries', requireOwner, requireBusinessOwnership, wrap(async (req, res) => {
+  const enquiries = await Enquiry.findByBusinessId(req.business.id)
   return res.json({ ok: true, enquiries })
-})
+}))
 
 export default router

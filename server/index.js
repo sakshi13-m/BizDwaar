@@ -37,6 +37,13 @@ app.use('/api/owner', ownerRouter)
 app.use('/api/businesses', publicRouter) // Public GET /api/businesses/:slug
 app.use('/api/enquiries', enquiryRouter)  // Public POST /api/enquiries
 
+// JSON error handler for API routes (async errors forwarded via next(err))
+app.use('/api', (err, req, res, next) => {
+  console.error('API error:', err.message)
+  if (res.headersSent) return next(err)
+  res.status(500).json({ error: 'server_error', message: 'Something went wrong. Please try again.' })
+})
+
 // Serve React build when dist/ exists (production and GoDaddy hosting)
 import { existsSync } from 'fs'
 const distDir = path.resolve(__dirname, '..', 'dist')

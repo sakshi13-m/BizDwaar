@@ -65,5 +65,30 @@ async function initSchema() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `)
 
+  await migrateOwnerSessionHash()
+
   console.log('DB schema ready')
+}
+
+// Additive, idempotent migration: nullable owner_session_hash + index.
+// Existing rows keep NULL (reachable only via the optional admin fallback).
+async function migrateOwnerSessionHash() {
+  const db = pool
+  const [cols] = await db.execute(
+    `SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'businesses' AND COLUMN_NAME = 'owner_session_hash'`
+  )
+  if (Number(cols[0].n) === 0) {
+    await db.execute('ALTER TABLE businesses ADD COLUMN owner_session_hash CHAR(64) NULL DEFAULT NULL')
+    console.log('Migration: added businesses.owner_session_hash')
+  }
+
+  const [idx] = await db.execute(
+    `SELECT COUNT(*) AS n FROM information_schema.STATISTICS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'businesses' AND INDEX_NAME = 'idx_owner_session_hash'`
+  )
+  if (Number(idx[0].n) === 0) {
+    await db.execute('CREATE INDEX idx_owner_session_hash ON businesses (owner_session_hash)')
+    console.log('Migration: added index idx_owner_session_hash')
+  }
 }
