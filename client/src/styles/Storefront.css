@@ -59,7 +59,7 @@
 .product-card__img { aspect-ratio: 4 / 3.4; }
 .product-card__body { padding: 1.2rem 1.3rem 1.4rem; display: flex; flex-direction: column; flex: 1; }
 .product-card__name { font-size: 1.35rem; margin-bottom: .35rem; }
-.product-card__desc { color: var(--ink-2); font-size: .93rem; margin-bottom: .9rem; }
+.product-card__desc { color: var(--ink-2); font-size: .93rem; margin-bottom: .9rem; white-space: pre-line; }
 .product-card__meta { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; margin-top: auto; }
 .size-text { font-size: .88rem; color: var(--ink-3); font-weight: 600; }
 .avail { align-self: flex-start; margin-top: .7rem; font-size: .75rem; font-weight: 700; padding: .2rem .65rem; border-radius: 999px; }

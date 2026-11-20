@@ -4,6 +4,11 @@ import StorefrontView from '../components/StorefrontView'
 import SmartImage from '../components/SmartImage'
 import { itemImageFor } from '../lib/imagery'
 
+// A catalogue row the owner added but never filled in is ignored
+function hasContent(item) {
+  return ['name', 'description', 'price', 'unitOrSize'].some(k => typeof item[k] === 'string' && item[k].trim() !== '')
+}
+
 // Turn empty strings into nulls so optional fields (e.g. contact email) pass server validation
 function toPayload(approved) {
   const blank = v => (typeof v === 'string' && v.trim() === '' ? null : v)
@@ -17,7 +22,7 @@ function toPayload(approved) {
       contactEmail: blank(p.contactEmail),
       contactPhone: blank(p.contactPhone)
     },
-    approvedCatalogue: approved.approvedCatalogue.map(item => ({
+    approvedCatalogue: approved.approvedCatalogue.filter(hasContent).map(item => ({
       name:          blank(item.name),
       description:   blank(item.description),
       price:         blank(item.price),
@@ -28,6 +33,81 @@ function toPayload(approved) {
     }))
   }
 }
+
+// Local-only identity for catalogue rows (never sent to the server)
+let keySeq = 0
+const nextKey = () => `item-${++keySeq}`
+
+function emptyItem() {
+  return {
+    _key: nextKey(), _source: 'owner',
+    name: '', description: '', price: '', unitOrSize: '', attributes: [],
+    publicVisible: true,   // the owner is adding it themselves
+    availability: ''
+  }
+}
+
+/**
+ * Work out which form field answers an AI "missing information" question.
+ * Returns { kind: 'profile'|'item', field, index?, append? }.
+ * `append` targets (free-text answers) add a labelled line to a description.
+ */
+function resolveQuestion(q, catalogue) {
+  const text = `${q.field || ''} ${q.question || ''}`.toLowerCase()
+
+  // Which product is this about? Explicit index like "catalogueDrafts[1].price", or a product name mentioned
+  let index = null
+  const idx = (q.field || '').match(/\[(\d+)\]/)
+  if (idx && catalogue[Number(idx[1])]) index = Number(idx[1])
+  if (index === null) {
+    const hit = catalogue.findIndex(it => it.name && it.name.trim().length > 2 && text.includes(it.name.trim().toLowerCase()))
+    if (hit >= 0) index = hit
+  }
+
+  // Product-level answer: go to the item's field, or add the first product if there are none yet
+  const itemField = (field, emptyCheck) => {
+    if (catalogue.length === 0) return { kind: 'addItem' }
+    const i = index !== null ? index : catalogue.findIndex(it => emptyCheck(it))
+    return { kind: 'item', field, index: i >= 0 ? i : 0 }
+  }
+
+  if (/price|cost|rate|₹|rupee|how much/.test(text)) return itemField('price', it => !it.price)
+  if (/size|weight|volume|quantity|unit|dimension|gram|\bml\b|\bkg\b|length/.test(text)) return itemField('unitOrSize', it => !it.unitOrSize)
+  if (/availab|in stock|out of stock|made to order/.test(text)) return itemField('availability', it => !it.availability)
+  if (/(describe|description).{0,40}(product|item|service)|(product|item|service).{0,20}description/.test(text)) {
+    return itemField('description', it => !it.description)
+  }
+  // "What products do you sell? Please list each item" → add products
+  if (/(list|what|which).{0,40}(products|items|services)|products?\s*$|^\s*products?\b/.test(text)) return { kind: 'addItem' }
+
+  if (/e-?mail/.test(text)) return { kind: 'profile', field: 'contactEmail' }
+  if (/phone|whatsapp|mobile|contact|call|reach you|get in touch/.test(text)) return { kind: 'profile', field: 'contactPhone' }
+  if (/location|address|city|area|where (are|is) you|based/.test(text)) return { kind: 'profile', field: 'location' }
+  if (/category|type of business/.test(text)) return { kind: 'profile', field: 'category' }
+
+  // Anything else (ingredients, delivery, materials…) is answered in a description
+  if (index !== null) return { kind: 'item', field: 'description', index, append: true }
+  return { kind: 'profile', field: 'description', append: true }
+}
+
+// "delivery_area" → "Delivery area: " — the line a free-text answer is typed after
+// "paymentMethods" / "delivery_area" → "Payment methods: " — readable on the public page
+function answerPrefix(q) {
+  const label = (q.field || 'Answer')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/[\[\]._]+/g, ' ')
+    .replace(/\b\d+\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase() || 'answer'
+  return `${label.charAt(0).toUpperCase()}${label.slice(1)}: `
+}
+
+const PROFILE_FIELD_IDS = {
+  description: 'rv-desc', category: 'rv-cat', location: 'rv-loc',
+  contactEmail: 'rv-email', contactPhone: 'rv-phone'
+}
+const ITEM_FIELD_IDS = { price: 'it-price', unitOrSize: 'it-size', availability: 'it-avail', description: 'it-desc' }
 
 const AVAILABILITY_OPTIONS = [
   { value: '', label: 'Not stated' },
@@ -66,6 +146,8 @@ export default function OwnerReview({ businessId, onPublished }) {
               contactPhone:  savedProfile.contactPhone || ''
             },
             approvedCatalogue: (res.business.approvedCatalogue || []).map(item => ({
+              _key:          nextKey(),
+              _source:       'saved',
               name:          item.name || '',
               description:   item.description || '',
               price:         item.price || '',
@@ -88,6 +170,8 @@ export default function OwnerReview({ businessId, onPublished }) {
             contactPhone:  ''
           },
           approvedCatalogue: (draft?.catalogueDrafts || []).map(item => ({
+            _key:          nextKey(),
+            _source:       'ai',
             name:          item.name || '',
             description:   item.description || '',
             price:         item.price || '',
@@ -119,6 +203,75 @@ export default function OwnerReview({ businessId, onPublished }) {
       return { ...a, approvedCatalogue: cat }
     })
     setSaved(false)
+  }
+
+  function focusField(id) {
+    // Wait for React to render any new row before focusing
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const el = document.getElementById(id)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.focus({ preventScroll: true })
+      if (typeof el.setSelectionRange === 'function' && el.value != null && el.tagName !== 'SELECT') {
+        el.setSelectionRange(el.value.length, el.value.length)
+      }
+    }))
+  }
+
+  function addItem() {
+    const newIndex = approved.approvedCatalogue.length
+    setApproved(a => ({ ...a, approvedCatalogue: [...a.approvedCatalogue, emptyItem()] }))
+    setSaved(false)
+    focusField(`it-name-${newIndex}`)
+  }
+
+  function removeItem(index) {
+    const item = approved.approvedCatalogue[index]
+    const label = item?.name ? `"${item.name}"` : `item ${index + 1}`
+    if (!window.confirm(`Remove ${label} from your catalogue?`)) return
+    setApproved(a => ({ ...a, approvedCatalogue: a.approvedCatalogue.filter((_, i) => i !== index) }))
+    setSaved(false)
+  }
+
+  // Jump to the field that answers a question; free-text answers get a labelled line to type after
+  function answerQuestion(q) {
+    const target = resolveQuestion(q, approved.approvedCatalogue)
+    const prefix = answerPrefix(q)
+
+    if (target.kind === 'addItem') {
+      // Reuse an empty row the owner already added, otherwise add one
+      const blank = approved.approvedCatalogue.findIndex(it => !hasContent(it))
+      if (blank >= 0) focusField(`it-name-${blank}`)
+      else addItem()
+      return
+    }
+
+    if (target.kind === 'profile') {
+      if (target.append) {
+        const cur = approved.approvedProfile.description || ''
+        if (!cur.includes(prefix)) updateProfile('description', cur ? `${cur.trimEnd()}\n${prefix}` : prefix)
+      }
+      focusField(PROFILE_FIELD_IDS[target.field])
+    } else {
+      if (target.append) {
+        const cur = approved.approvedCatalogue[target.index]?.description || ''
+        if (!cur.includes(prefix)) updateCatalogueItem(target.index, 'description', cur ? `${cur.trimEnd()}\n${prefix}` : prefix)
+      }
+      focusField(`${ITEM_FIELD_IDS[target.field]}-${target.index}`)
+    }
+  }
+
+  // A question counts as answered when its target field has a value (free-text ones: once something follows the label)
+  function isAnswered(q) {
+    const target = resolveQuestion(q, approved.approvedCatalogue)
+    if (target.kind === 'addItem') return approved.approvedCatalogue.some(hasContent)
+    const value = target.kind === 'profile'
+      ? approved.approvedProfile[target.field]
+      : approved.approvedCatalogue[target.index]?.[target.field]
+    if (!target.append) return Boolean(value && String(value).trim())
+    const prefix = answerPrefix(q)
+    const at = (value || '').indexOf(prefix)
+    return at >= 0 && (value || '').slice(at + prefix.length).split('\n')[0].trim().length > 0
   }
 
   async function handleSave() {
@@ -198,6 +351,7 @@ export default function OwnerReview({ businessId, onPublished }) {
   const visibleCount = catalogue.filter(i => i.publicVisible).length
   const hasNoVisible = catalogue.length > 0 && visibleCount === 0
   const claimsPending = unsupportedClaims.filter((_, i) => !checkedClaims[i]).length
+  const answeredCount = missingQuestions.filter(q => isAnswered(q)).length
   const aiFailed = !draft.analysedAt
   const isLive = business.status === 'published'
   const ownerWords = business.ownerInput?.description
@@ -216,7 +370,7 @@ export default function OwnerReview({ businessId, onPublished }) {
     location:     profile.location,
     contactEmail: profile.contactEmail || null,
     contactPhone: profile.contactPhone || null,
-    catalogue:    catalogue.filter(i => i.publicVisible)
+    catalogue:    catalogue.filter(i => i.publicVisible && hasContent(i))
   }
 
   return (
@@ -364,8 +518,12 @@ export default function OwnerReview({ businessId, onPublished }) {
             </div>
 
             {catalogue.length === 0 && (
-              <div className="empty-inline">
-                <p>No products were found in your description. Your storefront will show your business profile and enquiry form.</p>
+              <div className="empty-inline empty-inline--action">
+                <p>
+                  <strong>No products or services yet.</strong> Bizdwaar didn't find any in your description —
+                  add them here. Without any, your storefront shows your profile and enquiry form only.
+                </p>
+                <button type="button" className="btn btn--primary btn--sm" onClick={addItem}>+ Add a product or service</button>
               </div>
             )}
 
@@ -375,7 +533,7 @@ export default function OwnerReview({ businessId, onPublished }) {
 
             <div className="item-list">
               {catalogue.map((item, i) => (
-                <article key={i} className={`item-card ${item.publicVisible ? 'is-visible' : ''}`}>
+                <article key={item._key || i} className={`item-card ${item.publicVisible ? 'is-visible' : ''}`}>
                   <div className="item-card__media">
                     <SmartImage
                       src={itemImageFor(item, profile.category, i)}
@@ -387,7 +545,10 @@ export default function OwnerReview({ businessId, onPublished }) {
                   </div>
                   <div className="item-card__fields">
                     <div className="item-card__top">
-                      <span className="item-card__index">Item {i + 1}</span>
+                      <span className="item-card__index">
+                        Item {i + 1}
+                        {item._source === 'owner' && <span className="badge badge--owner">Added by you</span>}
+                      </span>
                       <label className="switch-field">
                         <input
                           type="checkbox"
@@ -406,7 +567,7 @@ export default function OwnerReview({ businessId, onPublished }) {
 
                     <div className="field">
                       <label htmlFor={`it-desc-${i}`}>
-                        Description <span className="badge badge--ai">AI draft · please check</span>
+                        Description {item._source === 'ai' && item.description && <span className="badge badge--ai">AI draft · please check</span>}
                       </label>
                       <textarea id={`it-desc-${i}`} value={item.description || ''} onChange={e => updateCatalogueItem(i, 'description', e.target.value)} rows={2} maxLength={1000} />
                     </div>
@@ -452,12 +613,19 @@ export default function OwnerReview({ businessId, onPublished }) {
                         {AVAILABILITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
                     </div>
+
+                    <button type="button" className="btn btn--text item-card__remove" onClick={() => removeItem(i)}>
+                      Remove this item
+                    </button>
                   </div>
                 </article>
               ))}
             </div>
             {catalogue.length > 0 && (
-              <p className="field__help">Images are illustrative mood photos chosen by category and are labelled as such on your storefront.</p>
+              <>
+                <button type="button" className="add-item" onClick={addItem}>+ Add another product or service</button>
+                <p className="field__help">Images are illustrative mood photos chosen by category and are labelled as such on your storefront.</p>
+              </>
             )}
           </section>
         </div>
@@ -468,14 +636,26 @@ export default function OwnerReview({ businessId, onPublished }) {
             <section className="note-card note-card--mango">
               <span className="badge badge--missing">Missing information</span>
               <h3>Bizdwaar needs a few answers</h3>
-              <p>These weren't in your description, so we left them blank instead of guessing.</p>
+              <p>
+                These weren't in your description, so we left them blank instead of guessing.
+                Tap <strong>Answer</strong> to jump to the right field. Skip any that don't apply.
+              </p>
+              <p className="question-progress">
+                <strong>{answeredCount}</strong> of {missingQuestions.length} answered
+              </p>
               <ul className="question-list">
-                {missingQuestions.map((q, i) => (
-                  <li key={i}>
-                    <span className="question-list__field">{q.field}</span>
-                    {q.question}
-                  </li>
-                ))}
+                {missingQuestions.map((q, i) => {
+                  const done = isAnswered(q)
+                  return (
+                    <li key={i} className={done ? 'is-answered' : ''}>
+                      <span className="question-list__field">{done ? '✓ Answered' : answerPrefix(q).replace(/:\s*$/, '')}</span>
+                      <span className="question-list__text">{q.question}</span>
+                      <button type="button" className="question-list__btn" onClick={() => answerQuestion(q)}>
+                        {done ? 'Edit answer' : 'Answer →'}
+                      </button>
+                    </li>
+                  )
+                })}
               </ul>
             </section>
           )}
